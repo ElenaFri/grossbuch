@@ -7,3 +7,15 @@ target_compile_options(tst_core PRIVATE
 )
 
 add_test(NAME tst_core COMMAND tst_core)
+
+# Tests de l'onglet de saisie (Qt Test, Widgets). Voir Phase 4 du plan.
+add_executable(tst_entrytab tst_entrytab.cpp)
+target_link_libraries(tst_entrytab PRIVATE grossbuch_ui Qt6::Test)
+
+target_compile_options(tst_entrytab PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_entrytab COMMAND tst_entrytab)
+# Exécution sans serveur graphique.
+set_tests_properties(tst_entrytab PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

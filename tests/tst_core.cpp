@@ -31,6 +31,7 @@ private slots:
     void removeExpense();
     void totalsByCategory();
     void monthlyTotalsForYear();
+    void monthAndYearBoundariesAreExclusive();
     void availableYears();
     void centsHaveNoRoundingError();
 
@@ -310,6 +311,51 @@ void CoreTest::monthlyTotalsForYear()
     QCOMPARE(totals[1], qint64(0));    // février
     QCOMPARE(totals[2], qint64(4200)); // mars
     QCOMPARE(totals[11], qint64(7000)); // décembre
+}
+
+void CoreTest::monthAndYearBoundariesAreExclusive()
+{
+    const int courses = categoryId(QStringLiteral("Courses"));
+
+    auto addOne = [this, courses](qint64 cents, const QDate &date) {
+        Expense expense;
+        expense.amountCents = cents;
+        expense.date = date;
+        expense.categoryId = courses;
+        QVERIFY(m_expenses->add(expense).has_value());
+    };
+
+    // Autour de la frontière mars/avril 2025.
+    addOne(100, QDate(2025, 3, 1));  // premier jour de mars
+    addOne(200, QDate(2025, 3, 31)); // dernier jour de mars
+    addOne(400, QDate(2025, 4, 1));  // premier jour d'avril
+    // Autour de la frontière décembre 2025 / janvier 2026.
+    addOne(800, QDate(2025, 12, 31));
+    addOne(1600, QDate(2026, 1, 1));
+
+    // forMonth : mars contient ses deux dépenses, pas celle du 1er avril.
+    const QVector<Expense> march = m_expenses->forMonth(2025, 3);
+    QCOMPARE(march.size(), 2);
+    QCOMPARE(march.first().date, QDate(2025, 3, 1));
+    QCOMPARE(march.last().date, QDate(2025, 3, 31));
+
+    const QVector<Expense> april = m_expenses->forMonth(2025, 4);
+    QCOMPARE(april.size(), 1);
+    QCOMPARE(april.first().date, QDate(2025, 4, 1));
+
+    // totalsByCategory : le total de mars n'inclut pas le 1er avril.
+    const QVector<CategoryTotal> marchTotals = m_expenses->totalsByCategory(2025, 3);
+    QCOMPARE(marchTotals.size(), 1);
+    QCOMPARE(marchTotals.first().amountCents, qint64(300));
+
+    // monthlyTotals : décembre 2025 contient le 31/12 mais pas le 1er/01/2026.
+    const std::array<qint64, 12> totals2025 = m_expenses->monthlyTotals(2025);
+    QCOMPARE(totals2025[2], qint64(300));  // mars
+    QCOMPARE(totals2025[3], qint64(400));  // avril
+    QCOMPARE(totals2025[11], qint64(800)); // décembre
+
+    const std::array<qint64, 12> totals2026 = m_expenses->monthlyTotals(2026);
+    QCOMPARE(totals2026[0], qint64(1600)); // janvier 2026
 }
 
 void CoreTest::availableYears()

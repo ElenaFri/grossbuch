@@ -80,15 +80,15 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] Injecter le `core` (repository) dans l'UI
 
 ### Phase 4 — Onglet Saisie
-- [ ] Champ montant (validation numérique, format monétaire)
-- [ ] Sélecteur de date (par défaut : aujourd'hui)
-- [ ] Champ libellé optionnel
-- [ ] Liste déroulante des catégories sélectionnables (sous-catégories, ou catégorie racine si elle n'a pas d'enfant), groupées par catégorie racine
-- [ ] Bouton « Enregistrer » + feedback de confirmation
-- [ ] Liste des dépenses du mois en cours sous le formulaire
-- [ ] Modifier une dépense sélectionnée dans la liste
-- [ ] Supprimer une dépense sélectionnée (avec confirmation)
-- [ ] Rafraîchir les autres onglets après ajout, modification ou suppression
+- [x] Champ montant (validation numérique, format monétaire)
+- [x] Sélecteur de date (par défaut : aujourd'hui)
+- [x] Champ libellé optionnel
+- [x] Liste déroulante des catégories sélectionnables (sous-catégories, ou catégorie racine si elle n'a pas d'enfant), groupées par catégorie racine
+- [x] Bouton « Enregistrer » + feedback de confirmation
+- [x] Liste des dépenses du mois en cours sous le formulaire
+- [x] Modifier une dépense sélectionnée dans la liste
+- [x] Supprimer une dépense sélectionnée (avec confirmation)
+- [x] Rafraîchir les autres onglets après ajout, modification ou suppression
 
 ### Phase 5 — Onglet Récapitulatif mensuel
 - [ ] Sélecteur de mois (par défaut : mois en cours)

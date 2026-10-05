@@ -45,13 +45,25 @@ target_compile_options(grossbuch_core PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
 )
 
+# --- Bibliothèque d'interface (Qt Widgets) ----------------------------------
+add_library(grossbuch_ui STATIC
+    src/ui/MainWindow.cpp
+    src/ui/EntryTab.cpp
+)
+
+target_include_directories(grossbuch_ui PUBLIC src)
+target_link_libraries(grossbuch_ui PUBLIC Qt6::Widgets grossbuch_core)
+
+target_compile_options(grossbuch_ui PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
 # --- Cible applicative ------------------------------------------------------
 add_executable(grossbuch
     src/main.cpp
-    src/ui/MainWindow.cpp
 )
 
-target_link_libraries(grossbuch PRIVATE Qt6::Widgets grossbuch_core)
+target_link_libraries(grossbuch PRIVATE grossbuch_ui)
 
 target_compile_options(grossbuch PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>

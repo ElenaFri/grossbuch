@@ -10,6 +10,7 @@
 #include <QDateEdit>
 #include <QDoubleSpinBox>
 #include <QLineEdit>
+#include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSignalSpy>
@@ -282,6 +283,7 @@ int main(int argc, char *argv[])
 {
     qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
     QApplication app(argc, argv);
+    QLocale::setDefault(QLocale(QLocale::French, QLocale::France));
     EntryTabTest test;
     return QTest::qExec(&test, argc, argv);
 }

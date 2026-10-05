@@ -10,6 +10,7 @@
 #include <QChart>
 #include <QChartView>
 #include <QLineSeries>
+#include <QLocale>
 #include <QtTest>
 
 #include <memory>
@@ -197,6 +198,7 @@ int main(int argc, char *argv[])
 {
     qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
     QApplication app(argc, argv);
+    QLocale::setDefault(QLocale(QLocale::French, QLocale::France));
     ChartsTabTest test;
     return QTest::qExec(&test, argc, argv);
 }

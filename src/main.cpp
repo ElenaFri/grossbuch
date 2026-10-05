@@ -4,6 +4,7 @@
 #include "ui/MainWindow.h"
 
 #include <QApplication>
+#include <QLocale>
 #include <QMessageBox>
 
 int main(int argc, char *argv[])
@@ -12,6 +13,10 @@ int main(int argc, char *argv[])
     QApplication::setApplicationName(QStringLiteral("grossbuch"));
     QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
     QApplication::setApplicationDisplayName(QStringLiteral("grossbuch"));
+
+    // Application francophone : dates et montants toujours au format français,
+    // indépendamment de la locale du système. Voir Phase 7.
+    QLocale::setDefault(QLocale(QLocale::French, QLocale::France));
 
     grossbuch::Database database(grossbuch::Database::defaultDatabasePath());
     if (!database.open()) {

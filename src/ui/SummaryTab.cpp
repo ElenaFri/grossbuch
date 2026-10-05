@@ -2,15 +2,20 @@
 
 #include "core/Category.h"
 #include "core/CategoryRepository.h"
+#include "core/CsvExport.h"
 #include "core/ExpenseRepository.h"
 
 #include <QComboBox>
 #include <QDate>
+#include <QFileDialog>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
 #include <QLocale>
+#include <QMessageBox>
 #include <QPair>
+#include <QPushButton>
+#include <QSaveFile>
 #include <QSignalBlocker>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
@@ -57,12 +62,16 @@ SummaryTab::SummaryTab(CategoryRepository &categories, ExpenseRepository &expens
     m_year = new QComboBox;
     m_year->setObjectName(QStringLiteral("yearCombo"));
 
+    auto *exportButton = new QPushButton(tr("Exporter en CSV…"));
+    exportButton->setObjectName(QStringLiteral("exportButton"));
+
     auto *selectors = new QHBoxLayout;
     selectors->addWidget(new QLabel(tr("Période :")));
     selectors->addWidget(m_mode);
     selectors->addWidget(m_month);
     selectors->addWidget(m_year);
     selectors->addStretch();
+    selectors->addWidget(exportButton);
 
     // --- Tableau hiérarchique ---
     m_tree = new QTreeWidget;
@@ -88,6 +97,7 @@ SummaryTab::SummaryTab(CategoryRepository &categories, ExpenseRepository &expens
     connect(m_mode, &QComboBox::currentIndexChanged, this, &SummaryTab::updateView);
     connect(m_month, &QComboBox::currentIndexChanged, this, &SummaryTab::updateView);
     connect(m_year, &QComboBox::currentIndexChanged, this, &SummaryTab::updateView);
+    connect(exportButton, &QPushButton::clicked, this, &SummaryTab::onExport);
 
     refresh();
 }
@@ -136,6 +146,7 @@ void SummaryTab::updateView()
     QHash<int, qint64> byCategory;
     for (const CategoryTotal &total : totals)
         byCategory.insert(total.categoryId, total.amountCents);
+    m_currentAmounts = byCategory;
 
     const qint64 grandTotal = populateTree(byCategory);
 
@@ -153,6 +164,38 @@ void SummaryTab::updateView()
         period = tr("de l'année %1").arg(year);
     }
     m_total->setText(tr("Total %1 : %2").arg(period, formatMoney(grandTotal)));
+}
+
+void SummaryTab::onExport()
+{
+    const QString suggested =
+        m_mode->currentData().toInt() == ModeMonth
+            ? tr("recapitulatif-%1-%2.csv")
+                  .arg(m_year->currentData().toInt())
+                  .arg(m_month->currentData().toInt(), 2, 10, QLatin1Char('0'))
+            : tr("recapitulatif-%1.csv").arg(m_year->currentData().toInt());
+
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Exporter le récapitulatif"), suggested,
+        tr("Fichiers CSV (*.csv)"));
+    if (path.isEmpty())
+        return;
+
+    const QString csv = summaryToCsv(m_categories.all(), m_currentAmounts);
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QMessageBox::warning(this, tr("Export impossible"),
+                             tr("Impossible d'écrire le fichier :\n%1").arg(path));
+        return;
+    }
+    // BOM UTF-8 pour que les accents et le symbole € s'affichent dans Excel.
+    file.write("\xEF\xBB\xBF");
+    file.write(csv.toUtf8());
+    if (!file.commit()) {
+        QMessageBox::warning(this, tr("Export impossible"),
+                             tr("Impossible d'écrire le fichier :\n%1").arg(path));
+    }
 }
 
 qint64 SummaryTab::populateTree(const QHash<int, qint64> &byCategory)

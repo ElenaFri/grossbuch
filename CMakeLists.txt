@@ -25,8 +25,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Type de build" FORCE)
 endif()
 
-# Les composants Charts et Test seront ajoutés dans leurs phases respectives.
-find_package(Qt6 REQUIRED COMPONENTS Widgets Sql)
+# Le composant Charts sera ajouté dans sa phase dédiée.
+find_package(Qt6 REQUIRED COMPONENTS Widgets Sql Test)
+
+enable_testing()
 
 # --- Bibliothèque de logique métier (sans dépendance à Qt Widgets) ----------
 # Voir docs/adr/0004.
@@ -46,6 +48,7 @@ target_compile_options(grossbuch_core PRIVATE
 # --- Cible applicative ------------------------------------------------------
 add_executable(grossbuch
     src/main.cpp
+    src/ui/MainWindow.cpp
 )
 
 target_link_libraries(grossbuch PRIVATE Qt6::Widgets grossbuch_core)
@@ -57,3 +60,6 @@ target_compile_options(grossbuch PRIVATE
 # --- Installation -----------------------------------------------------------
 include(GNUInstallDirs)
 install(TARGETS grossbuch RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# --- Tests ------------------------------------------------------------------
+add_subdirectory(tests)

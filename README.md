@@ -67,17 +67,17 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] `ExpenseRepository` : liste des années disponibles
 
 ### Phase 2 — Tests unitaires du core
-- [ ] Mettre en place Qt Test dans CMake (`ctest`)
-- [ ] Tester l'insertion et la relecture d'une dépense
-- [ ] Tester la modification et la suppression d'une dépense
-- [ ] Tester les agrégations mensuelles par catégorie
-- [ ] Tester le total mensuel / annuel
-- [ ] Tester les montants en centimes (pas d'erreur d'arrondi)
+- [x] Mettre en place Qt Test dans CMake (`ctest`)
+- [x] Tester l'insertion et la relecture d'une dépense
+- [x] Tester la modification et la suppression d'une dépense
+- [x] Tester les agrégations mensuelles par catégorie
+- [x] Tester le total mensuel / annuel
+- [x] Tester les montants en centimes (pas d'erreur d'arrondi)
 
 ### Phase 3 — Interface : fenêtre principale
-- [ ] Créer `MainWindow` avec un `QTabWidget` à 3 onglets
-- [ ] Mettre en place l'icône, le titre et la taille par défaut
-- [ ] Injecter le `core` (repository) dans l'UI
+- [x] Créer `MainWindow` avec un `QTabWidget` à 3 onglets
+- [x] Mettre en place l'icône, le titre et la taille par défaut
+- [x] Injecter le `core` (repository) dans l'UI
 
 ### Phase 4 — Onglet Saisie
 - [ ] Champ montant (validation numérique, format monétaire)

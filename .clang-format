@@ -1,0 +1,27 @@
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++17
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+PointerAlignment: Right
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AlwaysBreakTemplateDeclarations: Yes
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: true
+  AfterFunction: true
+  AfterEnum: true
+  AfterStruct: true
+  AfterNamespace: false
+  AfterControlStatement: false
+  BeforeElse: false
+  BeforeCatch: false
+IncludeBlocks: Regroup
+SortIncludes: CaseInsensitive
+SpaceAfterCStyleCast: false
+...

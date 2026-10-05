@@ -46,11 +46,11 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 ## Plan de développement
 
 ### Phase 0 — Mise en place du projet
-- [ ] Initialiser l'arborescence (`src/`, `tests/`, `cmake/`, `packaging/`)
-- [ ] Écrire le `CMakeLists.txt` racine (C++17, détection de Qt6)
-- [ ] Configurer `clang-format` et `clang-tidy`
-- [ ] Vérifier un build « Hello Qt » minimal (fenêtre vide)
-- [ ] Documenter les dépendances de build (Qt6 Widgets, Sql, Charts, Test)
+- [x] Initialiser l'arborescence (`src/`, `tests/`, `cmake/`, `packaging/`)
+- [x] Écrire le `CMakeLists.txt` racine (C++17, détection de Qt6)
+- [x] Configurer `clang-format` et `clang-tidy`
+- [x] Vérifier un build « Hello Qt » minimal (fenêtre vide)
+- [x] Documenter les dépendances de build (Qt6 Widgets, Sql, Charts, Test)
 
 ### Phase 1 — Cœur métier (core)
 - [ ] Modéliser `Category` (id, nom, parent)

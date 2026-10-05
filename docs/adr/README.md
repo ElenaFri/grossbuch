@@ -1,0 +1,17 @@
+# Architecture Decision Records (ADR)
+
+Ce dossier regroupe les décisions d'architecture de grossbuch, au format proposé par Michael Nygard. Chaque fichier documente une décision : son contexte, le choix retenu et ses conséquences.
+
+Convention de nommage : `NNNN-titre-court.md`, numérotation incrémentale, jamais réutilisée. Une décision qui en remplace une autre ne modifie pas l'ancienne : elle crée un nouvel ADR et passe le statut de l'ancien à « Remplacé par … ».
+
+Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
+
+## Index
+
+- [0001 - Langage C++17 et framework Qt 6 Widgets](0001-langage-et-framework-ui.md)
+- [0002 - Persistance via SQLite et Qt SQL](0002-persistance-sqlite.md)
+- [0003 - Montants stockés en centimes entiers](0003-montants-en-centimes.md)
+- [0004 - Séparation du cœur métier et de l'interface](0004-separation-core-ui.md)
+- [0005 - Build CMake et paquet .deb via CPack](0005-build-cmake-et-paquet-deb.md)
+- [0006 - Catégories stockées en base et pré-remplies](0006-categories-en-base.md)
+- [0007 - Graphiques via Qt Charts](0007-graphiques-qt-charts.md)

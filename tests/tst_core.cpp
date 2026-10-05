@@ -68,8 +68,8 @@ int CoreTest::categoryId(const QString &name) const
 
 void CoreTest::seedPopulatesCategories()
 {
-    // 10 catégories racines + 24 sous-catégories.
-    QCOMPARE(m_categories->all().size(), 34);
+    // 10 catégories racines + 22 sous-catégories.
+    QCOMPARE(m_categories->all().size(), 32);
 }
 
 void CoreTest::seedHierarchyIsCorrect()
@@ -103,9 +103,9 @@ void CoreTest::seedHierarchyIsCorrect()
 
 void CoreTest::selectableCategories()
 {
-    // 24 sous-catégories + 2 racines sans enfant (Cadeaux et dons, Voyages).
+    // 22 sous-catégories + 2 racines sans enfant (Cadeaux et dons, Voyages).
     const QVector<Category> selectable = m_categories->selectable();
-    QCOMPARE(selectable.size(), 26);
+    QCOMPARE(selectable.size(), 24);
 
     bool hasVoyages = false;
     for (const Category &category : selectable) {
@@ -145,7 +145,7 @@ void CoreTest::reopeningKeepsSchemaAndSeed()
         QVERIFY(db.open());
 
         CategoryRepository categories(db);
-        QCOMPARE(categories.all().size(), 34);
+        QCOMPARE(categories.all().size(), 32);
 
         const QVector<Category> selectable = categories.selectable();
         QVERIFY(!selectable.isEmpty());
@@ -159,13 +159,13 @@ void CoreTest::reopeningKeepsSchemaAndSeed()
     }
 
     // Second cycle : réouverture du même fichier. Le seed ne doit pas se rejouer
-    // (toujours 34 catégories, pas 68) et les données doivent subsister.
+    // (toujours 32 catégories, pas 64) et les données doivent subsister.
     {
         Database db(path, QStringLiteral("reopen"));
         QVERIFY(db.open());
 
         CategoryRepository categories(db);
-        QCOMPARE(categories.all().size(), 34);
+        QCOMPARE(categories.all().size(), 32);
 
         ExpenseRepository expenses(db);
         const QVector<Expense> august = expenses.forMonth(2025, 8);

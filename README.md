@@ -33,10 +33,10 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - Alimentation → Courses · Restaurants
 - Vêtements → Adultes · Enfants
 - Déplacements → Transports en commun · Vélo · Voiture · Train
-- Éducation → École · Conservatoire · Danse · Centres aérés · Informatique · Arts
+- Éducation → École · Loisirs · Centres aérés · Formation continue
 - Livres et jeux → Adultes · Enfants
 - Santé → Adultes · Enfants
-- Maison → Strasbourg · Niederhaslach
+- Maison → Résidence principale · Résidence secondaire
 - Sorties → Musées · Sport · Spectacles · Babysitter
 - Cadeaux et dons
 - Voyages

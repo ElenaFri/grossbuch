@@ -53,18 +53,18 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] Documenter les dépendances de build (Qt6 Widgets, Sql, Charts, Test)
 
 ### Phase 1 — Cœur métier (core)
-- [ ] Modéliser `Category` (id, nom, parent)
-- [ ] Modéliser `Expense` (montant en centimes, date, libellé, catégorie)
-- [ ] Implémenter `Database` (ouverture SQLite, création du schéma)
-- [ ] Gérer la versioning / migration du schéma
-- [ ] Implémenter le seed des catégories au premier lancement
-- [ ] Implémenter `ExpenseRepository` : ajouter une dépense
-- [ ] `ExpenseRepository` : modifier une dépense existante
-- [ ] `ExpenseRepository` : supprimer une dépense
-- [ ] `ExpenseRepository` : lister les dépenses d'un mois donné
-- [ ] `ExpenseRepository` : agrégation par catégorie sur un mois donné
-- [ ] `ExpenseRepository` : total par mois pour une année donnée
-- [ ] `ExpenseRepository` : liste des années disponibles
+- [x] Modéliser `Category` (id, nom, parent)
+- [x] Modéliser `Expense` (montant en centimes, date, libellé, catégorie)
+- [x] Implémenter `Database` (ouverture SQLite, création du schéma)
+- [x] Gérer la versioning / migration du schéma
+- [x] Implémenter le seed des catégories au premier lancement
+- [x] Implémenter `ExpenseRepository` : ajouter une dépense
+- [x] `ExpenseRepository` : modifier une dépense existante
+- [x] `ExpenseRepository` : supprimer une dépense
+- [x] `ExpenseRepository` : lister les dépenses d'un mois donné
+- [x] `ExpenseRepository` : agrégation par catégorie sur un mois donné
+- [x] `ExpenseRepository` : total par mois pour une année donnée
+- [x] `ExpenseRepository` : liste des années disponibles
 
 ### Phase 2 — Tests unitaires du core
 - [ ] Mettre en place Qt Test dans CMake (`ctest`)

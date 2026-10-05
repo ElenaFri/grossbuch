@@ -25,15 +25,30 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Type de build" FORCE)
 endif()
 
-# Les composants Sql, Charts et Test seront ajoutés dans leurs phases respectives.
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+# Les composants Charts et Test seront ajoutés dans leurs phases respectives.
+find_package(Qt6 REQUIRED COMPONENTS Widgets Sql)
+
+# --- Bibliothèque de logique métier (sans dépendance à Qt Widgets) ----------
+# Voir docs/adr/0004.
+add_library(grossbuch_core STATIC
+    src/core/Database.cpp
+    src/core/CategoryRepository.cpp
+    src/core/ExpenseRepository.cpp
+)
+
+target_include_directories(grossbuch_core PUBLIC src)
+target_link_libraries(grossbuch_core PUBLIC Qt6::Core Qt6::Sql)
+
+target_compile_options(grossbuch_core PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
 
 # --- Cible applicative ------------------------------------------------------
 add_executable(grossbuch
     src/main.cpp
 )
 
-target_link_libraries(grossbuch PRIVATE Qt6::Widgets)
+target_link_libraries(grossbuch PRIVATE Qt6::Widgets grossbuch_core)
 
 target_compile_options(grossbuch PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>

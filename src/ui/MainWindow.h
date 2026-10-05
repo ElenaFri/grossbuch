@@ -7,6 +7,7 @@ namespace grossbuch {
 class CategoryRepository;
 class ExpenseRepository;
 class EntryTab;
+class SummaryTab;
 
 // Fenêtre principale : un QTabWidget à trois onglets (Saisie, Récapitulatif,
 // Graphiques). Les dépôts du cœur métier sont injectés par référence et
@@ -28,6 +29,7 @@ private:
     ExpenseRepository &m_expenses;
 
     EntryTab *m_entryTab = nullptr;
+    SummaryTab *m_summaryTab = nullptr;
 };
 
 } // namespace grossbuch

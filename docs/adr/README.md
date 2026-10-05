@@ -15,3 +15,4 @@ Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
 - [0005 - Build CMake et paquet .deb via CPack](0005-build-cmake-et-paquet-deb.md)
 - [0006 - Catégories stockées en base et pré-remplies](0006-categories-en-base.md)
 - [0007 - Graphiques via Qt Charts](0007-graphiques-qt-charts.md)
+- [0008 - Récapitulatif par catégorie, au mois ou à l'année](0008-recapitulatif-mois-ou-annee.md)

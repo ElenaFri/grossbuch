@@ -2,7 +2,7 @@
 
 Application de comptabilité privée pour Linux, écrite en C++ / Qt.
 
-L'objectif est de saisir rapidement ses dépenses, en les classant par catégories, de consulter un récapitulatif mensuel et de visualiser l'évolution des dépenses totales d'une année sur l'autre.
+L'objectif est de saisir rapidement ses dépenses, en les classant par catégories, de consulter un récapitulatif par catégorie au mois ou à l'année et de visualiser l'évolution des dépenses totales d'une année sur l'autre.
 
 On est dans une approche minimaliste et optimisée.
 
@@ -21,7 +21,7 @@ Les choix techniques, l'architecture et le modèle de données sont documentés 
 L'application s'organise autour de trois onglets :
 
 1. Accueil / Saisie : un formulaire pour enregistrer la prochaine dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante.
-2. Récapitulatif mensuel : un tableau du mois en cours, agrégé par catégorie (avec le détail par sous-catégorie), et un total général.
+2. Récapitulatif : un tableau agrégé par catégorie (avec le détail par sous-catégorie) et un total général, pour un mois ou une année entière au choix (par défaut le mois en cours).
 3. Graphiques annuels : courbes des dépenses totales (toutes catégories confondues) de toutes les années enregistrées, superposées, pour comparer les mois d'une année à l'autre.
 
 ---
@@ -41,7 +41,7 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - Cadeaux et dons
 - Voyages
 
-> Le récapitulatif mensuel agrège par catégorie racine (avec détail par sous-catégorie). Les graphiques annuels n'utilisent que le total général.
+> Le récapitulatif agrège par catégorie racine (avec détail par sous-catégorie), au mois ou à l'année. Les graphiques annuels n'utilisent que le total général.
 
 ## Plan de développement
 
@@ -90,11 +90,11 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] Supprimer une dépense sélectionnée (avec confirmation)
 - [x] Rafraîchir les autres onglets après ajout, modification ou suppression
 
-### Phase 5 — Onglet Récapitulatif mensuel
-- [ ] Sélecteur de mois (par défaut : mois en cours)
-- [ ] Tableau par catégorie racine avec sous-totaux par sous-catégorie
-- [ ] Ligne de total général du mois
-- [ ] Mise en forme monétaire (€, séparateurs de milliers)
+### Phase 5 — Onglet Récapitulatif
+- [x] Sélecteur de période : un mois ou une année entière, au choix (par défaut : mois en cours)
+- [x] Tableau par catégorie racine avec sous-totaux par sous-catégorie
+- [x] Ligne de total général de la période
+- [x] Mise en forme monétaire (€, séparateurs de milliers)
 
 ### Phase 6 — Onglet Graphiques annuels
 - [ ] Intégrer Qt Charts

@@ -99,8 +99,20 @@ QVector<Expense> ExpenseRepository::forMonth(int year, int month) const
 
 QVector<CategoryTotal> ExpenseRepository::totalsByCategory(int year, int month) const
 {
-    QVector<CategoryTotal> totals;
     const auto [start, end] = monthBounds(year, month);
+    return totalsByCategoryBetween(start, end);
+}
+
+QVector<CategoryTotal> ExpenseRepository::totalsByCategoryForYear(int year) const
+{
+    const auto [start, end] = yearBounds(year);
+    return totalsByCategoryBetween(start, end);
+}
+
+QVector<CategoryTotal> ExpenseRepository::totalsByCategoryBetween(const QString &start,
+                                                                  const QString &end) const
+{
+    QVector<CategoryTotal> totals;
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
         "SELECT category_id, SUM(amount) FROM expenses "

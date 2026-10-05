@@ -49,6 +49,7 @@ target_compile_options(grossbuch_core PRIVATE
 add_library(grossbuch_ui STATIC
     src/ui/MainWindow.cpp
     src/ui/EntryTab.cpp
+    src/ui/SummaryTab.cpp
 )
 
 target_include_directories(grossbuch_ui PUBLIC src)

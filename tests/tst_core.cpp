@@ -30,6 +30,7 @@ private slots:
     void updateExpense();
     void removeExpense();
     void totalsByCategory();
+    void totalsByCategoryForYear();
     void monthlyTotalsForYear();
     void monthAndYearBoundariesAreExclusive();
     void availableYears();
@@ -277,6 +278,37 @@ void CoreTest::totalsByCategory()
     addOne(9999, QDate(2025, 4, 1), courses);
 
     const QVector<CategoryTotal> totals = m_expenses->totalsByCategory(2025, 3);
+    QCOMPARE(totals.size(), 2);
+
+    QHash<int, qint64> byCategory;
+    for (const CategoryTotal &total : totals)
+        byCategory.insert(total.categoryId, total.amountCents);
+
+    QCOMPARE(byCategory.value(courses), qint64(3000));
+    QCOMPARE(byCategory.value(restaurants), qint64(3000));
+}
+
+void CoreTest::totalsByCategoryForYear()
+{
+    const int courses = categoryId(QStringLiteral("Courses"));
+    const int restaurants = categoryId(QStringLiteral("Restaurants"));
+
+    auto addOne = [this](qint64 cents, const QDate &date, int category) {
+        Expense expense;
+        expense.amountCents = cents;
+        expense.date = date;
+        expense.categoryId = category;
+        QVERIFY(m_expenses->add(expense).has_value());
+    };
+
+    // Deux mois différents de 2025 : le total annuel cumule toute l'année.
+    addOne(1000, QDate(2025, 1, 5), courses);
+    addOne(2000, QDate(2025, 6, 10), courses);
+    addOne(3000, QDate(2025, 11, 20), restaurants);
+    // Autre année : exclue.
+    addOne(9999, QDate(2024, 3, 1), courses);
+
+    const QVector<CategoryTotal> totals = m_expenses->totalsByCategoryForYear(2025);
     QCOMPARE(totals.size(), 2);
 
     QHash<int, qint64> byCategory;

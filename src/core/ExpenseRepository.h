@@ -37,6 +37,9 @@ public:
     // Total par catégorie (feuille) sur un mois donné.
     QVector<CategoryTotal> totalsByCategory(int year, int month) const;
 
+    // Total par catégorie (feuille) sur une année entière.
+    QVector<CategoryTotal> totalsByCategoryForYear(int year) const;
+
     // Totaux mensuels d'une année (index 0 = janvier ... 11 = décembre), en centimes.
     std::array<qint64, 12> monthlyTotals(int year) const;
 
@@ -44,6 +47,9 @@ public:
     QVector<int> availableYears() const;
 
 private:
+    QVector<CategoryTotal> totalsByCategoryBetween(const QString &start,
+                                                   const QString &end) const;
+
     Database &m_database;
 };
 

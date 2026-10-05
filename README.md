@@ -97,13 +97,13 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] Mise en forme monétaire (€, séparateurs de milliers)
 
 ### Phase 6 — Onglet Graphiques annuels
-- [ ] Intégrer Qt Charts
-- [ ] Une courbe par année (12 points = 12 mois), superposées
-- [ ] Afficher les trois dernières années par défaut
-- [ ] Sélecteur pour ajuster les années visibles
-- [ ] Légende, axes (mois en abscisse, montant en ordonnée)
-- [ ] Afficher uniquement le total mensuel (toutes catégories)
-- [ ] Rafraîchissement automatique à l'ajout d'une dépense
+- [x] Intégrer Qt Charts
+- [x] Une courbe par année (12 points = 12 mois), superposées
+- [x] Afficher les trois dernières années par défaut
+- [x] Sélecteur pour ajuster les années visibles
+- [x] Légende, axes (mois en abscisse, montant en ordonnée)
+- [x] Afficher uniquement le total mensuel (toutes catégories)
+- [x] Rafraîchissement automatique à l'ajout d'une dépense
 
 ### Phase 7 — Finitions & robustesse
 - [ ] Gestion des erreurs (base inaccessible, saisie invalide)

@@ -31,3 +31,15 @@ target_compile_options(tst_summarytab PRIVATE
 add_test(NAME tst_summarytab COMMAND tst_summarytab)
 # Exécution sans serveur graphique.
 set_tests_properties(tst_summarytab PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Tests de l'onglet Graphiques (Qt Test, Widgets, Charts). Voir Phase 6 du plan.
+add_executable(tst_chartstab tst_chartstab.cpp)
+target_link_libraries(tst_chartstab PRIVATE grossbuch_ui Qt6::Test)
+
+target_compile_options(tst_chartstab PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_chartstab COMMAND tst_chartstab)
+# Exécution sans serveur graphique.
+set_tests_properties(tst_chartstab PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

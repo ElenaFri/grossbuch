@@ -2,26 +2,14 @@
 
 #include "core/CategoryRepository.h"
 #include "core/ExpenseRepository.h"
+#include "ui/ChartsTab.h"
 #include "ui/EntryTab.h"
 #include "ui/SummaryTab.h"
 
 #include <QIcon>
-#include <QLabel>
 #include <QTabWidget>
 
 namespace grossbuch {
-
-namespace {
-
-// Contenu temporaire des onglets encore à construire (Phase 6).
-QWidget *makePlaceholder(const QString &text)
-{
-    auto *label = new QLabel(text);
-    label->setAlignment(Qt::AlignCenter);
-    return label;
-}
-
-} // namespace
 
 MainWindow::MainWindow(CategoryRepository &categories, ExpenseRepository &expenses, QWidget *parent)
     : QMainWindow(parent), m_categories(categories), m_expenses(expenses)
@@ -33,11 +21,12 @@ MainWindow::MainWindow(CategoryRepository &categories, ExpenseRepository &expens
 
     m_entryTab = new EntryTab(m_categories, m_expenses);
     m_summaryTab = new SummaryTab(m_categories, m_expenses);
+    m_chartsTab = new ChartsTab(m_expenses);
 
     auto *tabs = new QTabWidget(this);
     tabs->addTab(m_entryTab, tr("Saisie"));
     tabs->addTab(m_summaryTab, tr("Récapitulatif"));
-    tabs->addTab(makePlaceholder(tr("Graphiques annuels")), tr("Graphiques"));
+    tabs->addTab(m_chartsTab, tr("Graphiques"));
     setCentralWidget(tabs);
 
     connect(m_entryTab, &EntryTab::expensesChanged, this, &MainWindow::onExpensesChanged);
@@ -45,8 +34,8 @@ MainWindow::MainWindow(CategoryRepository &categories, ExpenseRepository &expens
 
 void MainWindow::onExpensesChanged()
 {
-    // L'onglet Graphiques sera rafraîchi ici une fois construit (Phase 6).
     m_summaryTab->refresh();
+    m_chartsTab->refresh();
 }
 
 } // namespace grossbuch

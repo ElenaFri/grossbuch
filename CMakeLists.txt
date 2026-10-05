@@ -25,8 +25,8 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Type de build" FORCE)
 endif()
 
-# Le composant Charts sera ajouté dans sa phase dédiée.
-find_package(Qt6 REQUIRED COMPONENTS Widgets Sql Test)
+# Le composant Charts est requis pour l'onglet des graphiques annuels (phase 6).
+find_package(Qt6 REQUIRED COMPONENTS Widgets Sql Test Charts)
 
 enable_testing()
 
@@ -50,10 +50,11 @@ add_library(grossbuch_ui STATIC
     src/ui/MainWindow.cpp
     src/ui/EntryTab.cpp
     src/ui/SummaryTab.cpp
+    src/ui/ChartsTab.cpp
 )
 
 target_include_directories(grossbuch_ui PUBLIC src)
-target_link_libraries(grossbuch_ui PUBLIC Qt6::Widgets grossbuch_core)
+target_link_libraries(grossbuch_ui PUBLIC Qt6::Widgets Qt6::Charts grossbuch_core)
 
 target_compile_options(grossbuch_ui PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>

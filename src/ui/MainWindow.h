@@ -9,7 +9,9 @@ namespace grossbuch {
 
 class CategoryRepository;
 class ExpenseRepository;
+class RecurringRepository;
 class EntryTab;
+class RecurringTab;
 class SummaryTab;
 class ChartsTab;
 
@@ -22,7 +24,7 @@ class MainWindow : public QMainWindow
 
 public:
     MainWindow(CategoryRepository &categories, ExpenseRepository &expenses,
-               QWidget *parent = nullptr);
+               RecurringRepository &recurring, QWidget *parent = nullptr);
 
 protected:
     // Sauvegarde la géométrie et l'onglet courant à la fermeture.
@@ -32,9 +34,14 @@ private slots:
     // Rafraîchit les onglets dépendants après une modification des dépenses.
     void onExpensesChanged();
 
+    // Rafraîchit tous les onglets après une modification des paiements récurrents
+    // (la matérialisation a pu créer ou retirer des occurrences).
+    void onRecurringChanged();
+
 private:
     CategoryRepository &m_categories;
     ExpenseRepository &m_expenses;
+    RecurringRepository &m_recurring;
 
     // Stocke l'état de l'interface (géométrie, dernier onglet) dans ~/.config,
     // séparément des données (constructeur explicite org/app : ne touche pas au
@@ -43,6 +50,7 @@ private:
 
     QTabWidget *m_tabs = nullptr;
     EntryTab *m_entryTab = nullptr;
+    RecurringTab *m_recurringTab = nullptr;
     SummaryTab *m_summaryTab = nullptr;
     ChartsTab *m_chartsTab = nullptr;
 };

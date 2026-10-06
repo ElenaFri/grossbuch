@@ -65,3 +65,15 @@ target_compile_options(tst_uistate PRIVATE
 add_test(NAME tst_uistate COMMAND tst_uistate)
 # Exécution sans serveur graphique.
 set_tests_properties(tst_uistate PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Tests de l'onglet Paiements récurrents (Qt Test, Widgets). Voir Phase 8 du plan.
+add_executable(tst_recurringtab tst_recurringtab.cpp)
+target_link_libraries(tst_recurringtab PRIVATE grossbuch_ui Qt6::Test)
+
+target_compile_options(tst_recurringtab PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_recurringtab COMMAND tst_recurringtab)
+# Exécution sans serveur graphique.
+set_tests_properties(tst_recurringtab PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

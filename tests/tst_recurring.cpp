@@ -1,5 +1,6 @@
 #include "core/CategoryRepository.h"
 #include "core/Database.h"
+#include "core/ExpenseRepository.h"
 #include "core/RecurringExpense.h"
 #include "core/RecurringRepository.h"
 
@@ -32,12 +33,21 @@ private slots:
     void allIsSortedByLabel();
     void reopeningKeepsSchemaAndData();
 
+    void materializeCreatesOneOccurrencePerMonth();
+    void materializeOccurrenceCarriesModelFields();
+    void materializeIsIdempotent();
+    void materializeGeneratesNoFutureMonth();
+    void materializeIgnoresFutureStartModel();
+    void materializeSkipsInactiveModel();
+    void materializeNeverRegeneratesDeletedOrPastMonths();
+
 private:
     int categoryId(const QString &name) const;
     RecurringExpense makeSample(const QString &label, int startYear, int startMonth) const;
 
     std::unique_ptr<Database> m_db;
     std::unique_ptr<CategoryRepository> m_categories;
+    std::unique_ptr<ExpenseRepository> m_expenses;
     std::unique_ptr<RecurringRepository> m_recurring;
 };
 
@@ -46,12 +56,14 @@ void RecurringTest::init()
     m_db = std::make_unique<Database>(QStringLiteral(":memory:"), QStringLiteral("rectest"));
     QVERIFY(m_db->open());
     m_categories = std::make_unique<CategoryRepository>(*m_db);
+    m_expenses = std::make_unique<ExpenseRepository>(*m_db);
     m_recurring = std::make_unique<RecurringRepository>(*m_db);
 }
 
 void RecurringTest::cleanup()
 {
     m_recurring.reset();
+    m_expenses.reset();
     m_categories.reset();
     m_db.reset();
 }
@@ -256,6 +268,110 @@ void RecurringTest::reopeningKeepsSchemaAndData()
         QCOMPARE(stored->amountCents, qint64(1200));
         QCOMPARE(stored->label, QStringLiteral("Abonnement"));
     }
+}
+
+void RecurringTest::materializeCreatesOneOccurrencePerMonth()
+{
+    const std::optional<int> id = m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+    QVERIFY(id.has_value());
+
+    // De janvier à mars inclus : trois occurrences, une par mois.
+    const int created = m_recurring->materializeDueOccurrences(QDate(2025, 3, 20));
+    QCOMPARE(created, 3);
+    QCOMPARE(m_expenses->forMonth(2025, 1).size(), 1);
+    QCOMPARE(m_expenses->forMonth(2025, 2).size(), 1);
+    QCOMPARE(m_expenses->forMonth(2025, 3).size(), 1);
+
+    // Le repère a avancé jusqu'au mois de asOf.
+    const std::optional<RecurringExpense> stored = m_recurring->byId(*id);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->lastYear, 2025);
+    QCOMPARE(stored->lastMonth, 3);
+}
+
+void RecurringTest::materializeOccurrenceCarriesModelFields()
+{
+    RecurringExpense model = makeSample(QStringLiteral("Loyer"), 2025, 2);
+    model.amountCents = 73500;
+    model.dayOfMonth = 5;
+    const std::optional<int> id = m_recurring->add(model);
+    QVERIFY(id.has_value());
+
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 2, 28)), 1);
+
+    const QVector<Expense> february = m_expenses->forMonth(2025, 2);
+    QCOMPARE(february.size(), 1);
+    const Expense &occurrence = february.first();
+    QCOMPARE(occurrence.amountCents, qint64(73500));
+    QCOMPARE(occurrence.label, QStringLiteral("Loyer"));
+    QCOMPARE(occurrence.categoryId, model.categoryId);
+    // Le jour du mois du modèle est respecté.
+    QCOMPARE(occurrence.date, QDate(2025, 2, 5));
+}
+
+void RecurringTest::materializeIsIdempotent()
+{
+    m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 3, 20)), 3);
+    // Rejouée pour le même mois : rien de nouveau, et pas de doublon.
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 3, 20)), 0);
+    QCOMPARE(m_expenses->forMonth(2025, 1).size(), 1);
+    QCOMPARE(m_expenses->forMonth(2025, 2).size(), 1);
+    QCOMPARE(m_expenses->forMonth(2025, 3).size(), 1);
+}
+
+void RecurringTest::materializeGeneratesNoFutureMonth()
+{
+    m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+
+    // asOf = février : seuls janvier et février sont générés, jamais mars.
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 2, 10)), 2);
+    QVERIFY(m_expenses->forMonth(2025, 3).isEmpty());
+}
+
+void RecurringTest::materializeIgnoresFutureStartModel()
+{
+    const std::optional<int> id =
+        m_recurring->add(makeSample(QStringLiteral("Futur"), 2026, 1));
+    QVERIFY(id.has_value());
+
+    // Le modèle commence après asOf : rien n'est généré et le repère ne bouge pas.
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 6, 15)), 0);
+    const std::optional<RecurringExpense> stored = m_recurring->byId(*id);
+    QVERIFY(stored.has_value());
+    QCOMPARE(stored->lastYear, 2025);
+    QCOMPARE(stored->lastMonth, 12);
+}
+
+void RecurringTest::materializeSkipsInactiveModel()
+{
+    const std::optional<int> id = m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+    QVERIFY(id.has_value());
+    QVERIFY(m_recurring->deactivate(*id));
+
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 3, 20)), 0);
+    QVERIFY(m_expenses->forMonth(2025, 1).isEmpty());
+}
+
+void RecurringTest::materializeNeverRegeneratesDeletedOrPastMonths()
+{
+    m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 3, 20)), 3);
+
+    // L'utilisateur supprime à la main l'occurrence de février.
+    const QVector<Expense> february = m_expenses->forMonth(2025, 2);
+    QCOMPARE(february.size(), 1);
+    QVERIFY(m_expenses->remove(february.first().id));
+
+    // Rejouer pour le même mois ne recrée pas février (le repère ne recule pas).
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 3, 20)), 0);
+    QVERIFY(m_expenses->forMonth(2025, 2).isEmpty());
+
+    // Avancer d'un mois ne génère que le nouveau mois, jamais le passé effacé.
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 4, 10)), 1);
+    QCOMPARE(m_expenses->forMonth(2025, 4).size(), 1);
+    QVERIFY(m_expenses->forMonth(2025, 2).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(RecurringTest)

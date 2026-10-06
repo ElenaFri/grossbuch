@@ -117,14 +117,14 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] Modéliser `RecurringExpense` (montant par défaut, catégorie, libellé, jour du mois, mois de début, actif)
 - [x] `RecurringRepository` : créer, modifier (montant/catégorie/libellé/jour, pour l'avenir uniquement), lister
 - [x] `RecurringRepository` : désactiver / réactiver un paiement (jamais de suppression, l'historique est conservé)
-- [ ] Matérialisation automatique au lancement : occurrences manquantes du mois de début (rattrapage à la création) jusqu'au mois en cours, repère idempotent, jamais de recréation d'une occurrence supprimée, aucun mois futur
-- [ ] Les occurrences générées sont de vraies dépenses (comptées dans Saisie, Récapitulatif et Graphiques) et ajustables à la main dans l'onglet Saisie
-- [ ] Tests unitaires du core (matérialisation, idempotence, rattrapage initial, non-régénération du passé, (dés)activation)
-- [ ] Onglet « Récurrents » inséré après « Saisie » : liste des paiements récurrents + formulaire d'ajout
-- [ ] Modifier un paiement récurrent (effet sur les occurrences futures uniquement, jamais rétroactif)
-- [ ] Désactiver / réactiver un paiement récurrent depuis l'onglet
-- [ ] Rafraîchir les autres onglets après création, modification ou (dés)activation
-- [ ] Tests de l'onglet (Qt Test, offscreen)
+- [x] Matérialisation automatique au lancement : occurrences manquantes du mois de début (rattrapage à la création) jusqu'au mois en cours, repère idempotent, jamais de recréation d'une occurrence supprimée, aucun mois futur
+- [x] Les occurrences générées sont de vraies dépenses (comptées dans Saisie, Récapitulatif et Graphiques) et ajustables à la main dans l'onglet Saisie
+- [x] Tests unitaires du core (matérialisation, idempotence, rattrapage initial, non-régénération du passé, (dés)activation)
+- [x] Onglet « Récurrents » inséré après « Saisie » : liste des paiements récurrents + formulaire d'ajout
+- [x] Modifier un paiement récurrent (effet sur les occurrences futures uniquement, jamais rétroactif)
+- [x] Désactiver / réactiver un paiement récurrent depuis l'onglet
+- [x] Rafraîchir les autres onglets après création, modification ou (dés)activation
+- [x] Tests de l'onglet (Qt Test, offscreen)
 
 ### Phase 9 — Packaging & distribution
 - [ ] Fichier `.desktop` + icône pour l'intégration au bureau

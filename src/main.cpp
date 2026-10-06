@@ -1,9 +1,11 @@
 #include "core/CategoryRepository.h"
 #include "core/Database.h"
 #include "core/ExpenseRepository.h"
+#include "core/RecurringRepository.h"
 #include "ui/MainWindow.h"
 
 #include <QApplication>
+#include <QDate>
 #include <QLocale>
 #include <QMessageBox>
 
@@ -28,7 +30,12 @@ int main(int argc, char *argv[])
     grossbuch::CategoryRepository categories(database);
     grossbuch::ExpenseRepository expenses(database);
 
-    grossbuch::MainWindow window(categories, expenses);
+    // Reporte les paiements récurrents dus jusqu'au mois en cours avant d'afficher
+    // l'interface, de sorte que leurs occurrences soient visibles partout.
+    grossbuch::RecurringRepository recurrings(database);
+    recurrings.materializeDueOccurrences(QDate::currentDate());
+
+    grossbuch::MainWindow window(categories, expenses, recurrings);
     window.show();
 
     return QApplication::exec();

@@ -1,6 +1,7 @@
 #include "core/CategoryRepository.h"
 #include "core/Database.h"
 #include "core/ExpenseRepository.h"
+#include "core/RecurringRepository.h"
 #include "ui/MainWindow.h"
 
 #include <QApplication>
@@ -34,6 +35,7 @@ private:
     std::unique_ptr<Database> m_db;
     std::unique_ptr<CategoryRepository> m_categories;
     std::unique_ptr<ExpenseRepository> m_expenses;
+    std::unique_ptr<RecurringRepository> m_recurring;
 };
 
 void UiStateTest::initTestCase()
@@ -49,6 +51,7 @@ void UiStateTest::init()
     QVERIFY(m_db->open());
     m_categories = std::make_unique<CategoryRepository>(*m_db);
     m_expenses = std::make_unique<ExpenseRepository>(*m_db);
+    m_recurring = std::make_unique<RecurringRepository>(*m_db);
 
     // Chaque test part d'une configuration vierge.
     QSettings settings(QStringLiteral("grossbuch"), QStringLiteral("grossbuch"));
@@ -58,7 +61,7 @@ void UiStateTest::init()
 
 std::unique_ptr<MainWindow> UiStateTest::makeWindow()
 {
-    return std::make_unique<MainWindow>(*m_categories, *m_expenses);
+    return std::make_unique<MainWindow>(*m_categories, *m_expenses, *m_recurring);
 }
 
 void UiStateTest::lastTabIsRestored()
@@ -67,7 +70,7 @@ void UiStateTest::lastTabIsRestored()
         auto window = makeWindow();
         auto *tabs = window->findChild<QTabWidget *>();
         QVERIFY(tabs != nullptr);
-        QCOMPARE(tabs->count(), 3);
+        QCOMPARE(tabs->count(), 4);
         tabs->setCurrentIndex(2);
         // La fermeture déclenche la sauvegarde dans closeEvent.
         window->close();

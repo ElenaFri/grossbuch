@@ -43,6 +43,15 @@ public:
 
     std::optional<RecurringExpense> byId(int id) const;
 
+    // Matérialise les occurrences dues pour tous les paiements actifs : crée une
+    // vraie dépense (liée au modèle via recurring_id) pour chaque mois allant du
+    // mois suivant le repère jusqu'au mois de asOf inclus, puis avance le repère.
+    // Aucun mois futur n'est généré ; l'opération est idempotente et ne recrée
+    // jamais une occurrence supprimée (le repère n'est jamais ramené en arrière).
+    // Renvoie le nombre d'occurrences créées (0 si rien n'est dû ou en cas
+    // d'échec, auquel cas la transaction est annulée). Voir docs/adr/0010.
+    int materializeDueOccurrences(const QDate &asOf);
+
 private:
     Database &m_database;
 };

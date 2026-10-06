@@ -4,6 +4,7 @@
 #include "core/CategoryRepository.h"
 #include "core/CsvExport.h"
 #include "core/ExpenseRepository.h"
+#include "ui/UiHelpers.h"
 
 #include <QComboBox>
 #include <QDate>
@@ -26,11 +27,6 @@
 namespace grossbuch {
 
 namespace {
-
-QString formatMoney(qint64 cents)
-{
-    return QLocale().toCurrencyString(static_cast<double>(cents) / 100.0);
-}
 
 void setAmount(QTreeWidgetItem *item, qint64 cents)
 {

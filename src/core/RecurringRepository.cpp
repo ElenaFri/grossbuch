@@ -5,6 +5,7 @@
 #include <QDate>
 #include <QSqlQuery>
 #include <QVariant>
+#include <QtGlobal>
 
 namespace grossbuch {
 
@@ -14,6 +15,18 @@ namespace {
 std::pair<int, int> previousMonth(int year, int month)
 {
     const int ordinal = year * 12 + (month - 1) - 1;
+    return {ordinal / 12, ordinal % 12 + 1};
+}
+
+// Numéro de mois absolu (… , janv. 2025 = 24300, …) et conversion inverse,
+// pour itérer simplement sur une plage de mois.
+int ordinalOf(int year, int month)
+{
+    return year * 12 + (month - 1);
+}
+
+std::pair<int, int> fromOrdinal(int ordinal)
+{
     return {ordinal / 12, ordinal % 12 + 1};
 }
 
@@ -129,6 +142,68 @@ std::optional<RecurringExpense> RecurringRepository::byId(int id) const
     if (!query.exec() || !query.next())
         return std::nullopt;
     return recurringFromQuery(query);
+}
+
+int RecurringRepository::materializeDueOccurrences(const QDate &asOf)
+{
+    const int asOfOrdinal = ordinalOf(asOf.year(), asOf.month());
+    const QVector<RecurringExpense> models = all();
+
+    QSqlDatabase db = m_database.connection();
+    if (!db.transaction())
+        return 0;
+
+    int created = 0;
+    for (const RecurringExpense &model : models) {
+        if (!model.active)
+            continue;
+
+        const int startOrdinal = ordinalOf(model.startYear, model.startMonth);
+        // On ne génère jamais avant le début, même si le repère est incohérent.
+        int repere = ordinalOf(model.lastYear, model.lastMonth);
+        if (repere < startOrdinal - 1)
+            repere = startOrdinal - 1;
+        if (asOfOrdinal <= repere)
+            continue; // rien de dû (inclut les modèles commençant dans le futur)
+
+        for (int ordinal = repere + 1; ordinal <= asOfOrdinal; ++ordinal) {
+            const auto [year, month] = fromOrdinal(ordinal);
+            const int lastDay = QDate(year, month, 1).daysInMonth();
+            const QDate date(year, month, qBound(1, model.dayOfMonth, lastDay));
+
+            QSqlQuery insert(db);
+            insert.prepare(QStringLiteral(
+                "INSERT INTO expenses(amount, date, label, category_id, recurring_id) "
+                "VALUES(?, ?, ?, ?, ?)"));
+            insert.addBindValue(model.amountCents);
+            insert.addBindValue(date.toString(Qt::ISODate));
+            insert.addBindValue(model.label.isEmpty() ? QVariant(QMetaType(QMetaType::QString))
+                                                      : QVariant(model.label));
+            insert.addBindValue(model.categoryId);
+            insert.addBindValue(model.id);
+            if (!insert.exec()) {
+                db.rollback();
+                return 0;
+            }
+            ++created;
+        }
+
+        const auto [lastYear, lastMonth] = fromOrdinal(asOfOrdinal);
+        QSqlQuery advance(db);
+        advance.prepare(QStringLiteral(
+            "UPDATE recurring_expenses SET last_year = ?, last_month = ? WHERE id = ?"));
+        advance.addBindValue(lastYear);
+        advance.addBindValue(lastMonth);
+        advance.addBindValue(model.id);
+        if (!advance.exec()) {
+            db.rollback();
+            return 0;
+        }
+    }
+
+    if (!db.commit())
+        return 0;
+    return created;
 }
 
 } // namespace grossbuch

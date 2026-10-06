@@ -49,8 +49,6 @@ private:
     void reloadExpenses();
     void enterEditMode(const Expense &expense);
     void leaveEditMode();
-    void selectCategory(int categoryId);
-    void showFeedback(const QString &text, bool error = false);
 
     CategoryRepository &m_categories;
     ExpenseRepository &m_expenses;

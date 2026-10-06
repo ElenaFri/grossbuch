@@ -18,11 +18,12 @@ Les choix techniques, l'architecture et le modèle de données sont documentés 
 
 ## Fonctionnalités cibles
 
-L'application s'organise autour de trois onglets :
+L'application s'organise autour de quatre onglets :
 
 1. Accueil / Saisie : un formulaire pour enregistrer la prochaine dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante.
-2. Récapitulatif : un tableau agrégé par catégorie (avec le détail par sous-catégorie) et un total général, pour un mois ou une année entière au choix (par défaut le mois en cours).
-3. Graphiques annuels : courbes des dépenses totales (toutes catégories confondues) de toutes les années enregistrées, superposées, pour comparer les mois d'une année à l'autre.
+2. Paiements récurrents : les dépenses qui reviennent chaque mois (loyer, abonnements, assurances), définies une fois comme modèles et reportées automatiquement sur le mois en cours, modifiables pour l'avenir et désactivables à tout moment sans perte de l'historique.
+3. Récapitulatif : un tableau agrégé par catégorie (avec le détail par sous-catégorie) et un total général, pour un mois ou une année entière au choix (par défaut le mois en cours).
+4. Graphiques annuels : courbes des dépenses totales (toutes catégories confondues) de toutes les années enregistrées, superposées, pour comparer les mois d'une année à l'autre.
 
 ---
 
@@ -106,12 +107,26 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] Rafraîchissement automatique à l'ajout d'une dépense
 
 ### Phase 7 — Finitions & robustesse
-- [ ] Gestion des erreurs (base inaccessible, saisie invalide)
-- [ ] Localisation FR (format de dates/montants via `QLocale`)
-- [ ] Persistance de l'état de l'UI (dernier onglet, taille fenêtre)
-- [ ] (Optionnel) Export CSV du récapitulatif
+- [x] Gestion des erreurs (base inaccessible, saisie invalide)
+- [x] Localisation FR (format de dates/montants via `QLocale`)
+- [x] Persistance de l'état de l'UI (dernier onglet, taille fenêtre)
+- [x] (Optionnel) Export CSV du récapitulatif
 
-### Phase 8 — Packaging & distribution
+### Phase 8 — Onglet Paiements récurrents
+- [x] Migration du schéma en version 2 (table `recurring_expenses`, colonne `recurring_id` sur `expenses`)
+- [x] Modéliser `RecurringExpense` (montant par défaut, catégorie, libellé, jour du mois, mois de début, actif)
+- [x] `RecurringRepository` : créer, modifier (montant/catégorie/libellé/jour, pour l'avenir uniquement), lister
+- [x] `RecurringRepository` : désactiver / réactiver un paiement (jamais de suppression, l'historique est conservé)
+- [ ] Matérialisation automatique au lancement : occurrences manquantes du mois de début (rattrapage à la création) jusqu'au mois en cours, repère idempotent, jamais de recréation d'une occurrence supprimée, aucun mois futur
+- [ ] Les occurrences générées sont de vraies dépenses (comptées dans Saisie, Récapitulatif et Graphiques) et ajustables à la main dans l'onglet Saisie
+- [ ] Tests unitaires du core (matérialisation, idempotence, rattrapage initial, non-régénération du passé, (dés)activation)
+- [ ] Onglet « Récurrents » inséré après « Saisie » : liste des paiements récurrents + formulaire d'ajout
+- [ ] Modifier un paiement récurrent (effet sur les occurrences futures uniquement, jamais rétroactif)
+- [ ] Désactiver / réactiver un paiement récurrent depuis l'onglet
+- [ ] Rafraîchir les autres onglets après création, modification ou (dés)activation
+- [ ] Tests de l'onglet (Qt Test, offscreen)
+
+### Phase 9 — Packaging & distribution
 - [ ] Fichier `.desktop` + icône pour l'intégration au bureau
 - [ ] Règles d'installation CMake (`install(TARGETS ...)`)
 - [ ] Configurer CPack avec le générateur `DEB`

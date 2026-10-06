@@ -36,6 +36,7 @@ add_library(grossbuch_core STATIC
     src/core/Database.cpp
     src/core/CategoryRepository.cpp
     src/core/ExpenseRepository.cpp
+    src/core/RecurringRepository.cpp
     src/core/CsvExport.cpp
 )
 

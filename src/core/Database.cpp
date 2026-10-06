@@ -133,6 +133,32 @@ bool Database::applyMigrations()
         }
     }
 
+    // Migration vers la version 2 : paiements récurrents (voir docs/adr/0010).
+    if (version < 2) {
+        const QStringList statements = {
+            QStringLiteral("CREATE TABLE recurring_expenses ("
+                           "  id INTEGER PRIMARY KEY,"
+                           "  amount INTEGER NOT NULL,"
+                           "  label TEXT,"
+                           "  category_id INTEGER NOT NULL REFERENCES categories(id),"
+                           "  day_of_month INTEGER NOT NULL,"
+                           "  start_year INTEGER NOT NULL,"
+                           "  start_month INTEGER NOT NULL,"
+                           "  active INTEGER NOT NULL DEFAULT 1,"
+                           "  last_year INTEGER NOT NULL DEFAULT 0,"
+                           "  last_month INTEGER NOT NULL DEFAULT 0)"),
+            QStringLiteral("ALTER TABLE expenses ADD COLUMN recurring_id INTEGER "
+                           "REFERENCES recurring_expenses(id)"),
+            QStringLiteral("CREATE INDEX idx_expenses_recurring ON expenses(recurring_id)"),
+        };
+        for (const QString &statement : statements) {
+            if (!query.exec(statement)) {
+                db.rollback();
+                return false;
+            }
+        }
+    }
+
     // PRAGMA user_version n'accepte pas de valeur liée : on interpole l'entier.
     if (!query.exec(QStringLiteral("PRAGMA user_version = %1").arg(schemaVersion))) {
         db.rollback();

@@ -8,6 +8,16 @@ target_compile_options(tst_core PRIVATE
 
 add_test(NAME tst_core COMMAND tst_core)
 
+# Tests unitaires des paiements récurrents (Qt Test). Voir Phase 8 du plan.
+add_executable(tst_recurring tst_recurring.cpp)
+target_link_libraries(tst_recurring PRIVATE grossbuch_core Qt6::Test)
+
+target_compile_options(tst_recurring PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_recurring COMMAND tst_recurring)
+
 # Tests de l'onglet de saisie (Qt Test, Widgets). Voir Phase 4 du plan.
 add_executable(tst_entrytab tst_entrytab.cpp)
 target_link_libraries(tst_entrytab PRIVATE grossbuch_ui Qt6::Test)
@@ -43,3 +53,15 @@ target_compile_options(tst_chartstab PRIVATE
 add_test(NAME tst_chartstab COMMAND tst_chartstab)
 # Exécution sans serveur graphique.
 set_tests_properties(tst_chartstab PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Tests de la persistance de l'état de l'UI (Qt Test, Widgets). Voir Phase 7.
+add_executable(tst_uistate tst_uistate.cpp)
+target_link_libraries(tst_uistate PRIVATE grossbuch_ui Qt6::Test)
+
+target_compile_options(tst_uistate PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_uistate COMMAND tst_uistate)
+# Exécution sans serveur graphique.
+set_tests_properties(tst_uistate PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

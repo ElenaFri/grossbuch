@@ -11,7 +11,7 @@ class Database
 {
 public:
     // Version du schéma gérée par le code courant.
-    static constexpr int schemaVersion = 1;
+    static constexpr int schemaVersion = 2;
 
     // Chemin du fichier de base dans le répertoire de données standard de
     // l'utilisateur (ex. ~/.local/share/grossbuch/grossbuch.db).

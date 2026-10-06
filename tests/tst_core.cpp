@@ -1,4 +1,5 @@
 #include "core/CategoryRepository.h"
+#include "core/CsvExport.h"
 #include "core/Database.h"
 #include "core/Expense.h"
 #include "core/ExpenseRepository.h"
@@ -35,6 +36,9 @@ private slots:
     void monthAndYearBoundariesAreExclusive();
     void availableYears();
     void centsHaveNoRoundingError();
+    void csvHeaderAndEmptyTotal();
+    void csvRowsUseRootAndChildNames();
+    void csvOmitsZeroAndFormatsDecimals();
 
 private:
     int categoryId(const QString &name) const;
@@ -436,6 +440,54 @@ void CoreTest::centsHaveNoRoundingError()
     addOne(Q_INT64_C(5000000000)); // 50 millions d'euros en centimes
     const std::array<qint64, 12> monthly = m_expenses->monthlyTotals(2025);
     QCOMPARE(monthly[1], Q_INT64_C(5000000030));
+}
+
+void CoreTest::csvHeaderAndEmptyTotal()
+{
+    // Aucun montant : seul l'en-tête et une ligne de total à zéro.
+    const QString csv = summaryToCsv(m_categories->all(), {});
+    const QStringList lines = csv.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    QCOMPARE(lines.size(), 2);
+    QCOMPARE(lines.first(), QStringLiteral("Catégorie;Sous-catégorie;Montant (€)"));
+    QCOMPARE(lines.last(), QStringLiteral("Total;;0,00"));
+}
+
+void CoreTest::csvRowsUseRootAndChildNames()
+{
+    // Une sous-catégorie produit « Racine;Enfant;montant » ; une racine sans
+    // enfant produit « Racine;;montant ». Les racines sont triées par nom
+    // (Alimentation avant Voyages).
+    QHash<int, qint64> amounts;
+    amounts.insert(categoryId(QStringLiteral("Courses")), 1000);
+    amounts.insert(categoryId(QStringLiteral("Restaurants")), 550);
+    amounts.insert(categoryId(QStringLiteral("Voyages")), 2000);
+
+    const QString csv = summaryToCsv(m_categories->all(), amounts);
+    const QStringList lines = csv.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+
+    // En-tête + 2 enfants d'Alimentation + Voyages + Total.
+    QCOMPARE(lines.size(), 5);
+    QCOMPARE(lines.at(1), QStringLiteral("Alimentation;Courses;10,00"));
+    QCOMPARE(lines.at(2), QStringLiteral("Alimentation;Restaurants;5,50"));
+    QCOMPARE(lines.at(3), QStringLiteral("Voyages;;20,00"));
+    QCOMPARE(lines.at(4), QStringLiteral("Total;;35,50"));
+}
+
+void CoreTest::csvOmitsZeroAndFormatsDecimals()
+{
+    // Une catégorie à zéro n'apparaît pas ; la mise en forme est indépendante de
+    // la locale (virgule décimale, pas de séparateur de milliers).
+    QHash<int, qint64> amounts;
+    amounts.insert(categoryId(QStringLiteral("Courses")), 123456); // 1234,56 €
+    amounts.insert(categoryId(QStringLiteral("Restaurants")), 0);  // omise
+
+    const QString csv = summaryToCsv(m_categories->all(), amounts);
+    const QStringList lines = csv.split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+
+    QCOMPARE(lines.size(), 3); // en-tête + Courses + Total
+    QCOMPARE(lines.at(1), QStringLiteral("Alimentation;Courses;1234,56"));
+    QVERIFY(!csv.contains(QStringLiteral("Restaurants")));
+    QCOMPARE(lines.at(2), QStringLiteral("Total;;1234,56"));
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

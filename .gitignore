@@ -71,3 +71,6 @@ Testing/
 COMPTES.db
 COMPTES.xlsx
 *.db
+
+# Paquets générés
+*.deb

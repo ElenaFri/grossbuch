@@ -127,20 +127,22 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - [x] Tests de l'onglet (Qt Test, offscreen)
 
 ### Phase 9 — Packaging & distribution
-- [ ] Fichier `.desktop` + icône pour l'intégration au bureau
-- [ ] Règles d'installation CMake (`install(TARGETS ...)`)
-- [ ] Configurer CPack avec le générateur `DEB`
-- [ ] Déclarer les dépendances runtime du `.deb` (libQt6...)
-- [ ] Générer et tester l'installation du `.deb` sur le système
-- [ ] (Optionnel) Workflow GitHub Actions : build + `.deb` sur les tags
+- [x] Fichier `.desktop` + icône pour l'intégration au bureau
+- [x] Règles d'installation CMake (`install(TARGETS ...)`)
+- [x] Configurer CPack avec le générateur `DEB`
+- [x] Déclarer les dépendances runtime du `.deb` (libQt6...)
+- [x] Générer et tester l'installation du `.deb` sur le système
+- [x] (Optionnel) Workflow GitHub Actions : build + `.deb` sur les tags
 
 ## Construire le projet
 
 > Prérequis (Debian/Ubuntu) :
 > ```sh
 > sudo apt install build-essential cmake \
->     qt6-base-dev qt6-charts-dev
+>     qt6-base-dev qt6-charts-dev libqt6sql6-sqlite
 > ```
+> Le paquet `libqt6sql6-sqlite` fournit le pilote SQLite de Qt, chargé à
+> l'exécution ; sans lui l'application ne peut pas ouvrir sa base.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -151,19 +153,21 @@ ctest --test-dir build        # lancer les tests
 
 ## Générer le paquet `.deb`
 
+> Prérequis supplémentaire : `dpkg-dev` (fournit `dpkg-shlibdeps`, utilisé pour
+> déduire automatiquement les dépendances Qt du paquet).
+
 ```sh
 cmake --build build --target package
 # ou :
 cd build && cpack -G DEB
 ```
 
-Le fichier `grossbuch_<version>_amd64.deb` est produit dans `build/`.
-Installation :
+Le fichier `grossbuch_<version>-1_amd64.deb` est produit dans `build/`.
+Installation (apt résout les dépendances runtime) :
 
 ```sh
-sudo apt install ./grossbuch_<version>_amd64.deb
+sudo apt install ./grossbuch_<version>-1_amd64.deb
 ```
 
-## Licence
-
-MIT © 2026 Elena FRISON — voir [LICENSE](LICENSE).
+Une release GitHub sur un tag `vX.Y.Z` construit et publie automatiquement ce
+paquet (voir `.github/workflows/release.yml`).

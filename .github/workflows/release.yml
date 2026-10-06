@@ -1,0 +1,47 @@
+name: Release
+
+# Construit le paquet .deb et le publie comme asset de release lorsqu'un tag
+# de version (vX.Y.Z) est pouss\u00e9. Voir Phase 9 du plan et docs/adr/0005.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer les dépendances
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            build-essential \
+            qt6-base-dev \
+            qt6-charts-dev \
+            libqt6sql6-sqlite \
+            dpkg-dev
+
+      - name: Configurer
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Compiler
+        run: cmake --build build -j
+
+      - name: Tester
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Générer le paquet .deb
+        run: cd build && cpack -G DEB
+
+      - name: Publier le paquet dans la release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/*.deb

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=grossbuch
+GenericName=Comptabilité personnelle
+GenericName[en]=Personal accounting
+Comment=Suivi des dépenses personnelles par catégories
+Comment[en]=Track personal expenses by category
+Exec=grossbuch
+Icon=grossbuch
+Terminal=false
+Categories=Office;Finance;Qt;
+Keywords=comptabilité;dépenses;budget;finances;argent;
+StartupNotify=true
+StartupWMClass=grossbuch

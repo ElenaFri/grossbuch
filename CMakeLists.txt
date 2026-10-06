@@ -77,7 +77,77 @@ target_compile_options(grossbuch PRIVATE
 
 # --- Installation -----------------------------------------------------------
 include(GNUInstallDirs)
+
+# Force les permissions 0755 sur les répertoires créés à l'installation (sinon
+# l'umask 002 produit du 0775, non conforme aux règles Debian).
+set(CMAKE_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE
+    GROUP_READ GROUP_EXECUTE
+    WORLD_READ WORLD_EXECUTE)
+
+# Binaire.
 install(TARGETS grossbuch RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Intégration au bureau : lanceur et icône scalable (thème hicolor).
+install(FILES packaging/grossbuch.desktop
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications
+)
+install(FILES packaging/grossbuch.svg
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps
+)
+
+# Documentation du paquet : copyright (DEP-5) et journal des modifications
+# compressé, attendus par les règles Debian sous usr/share/doc/grossbuch/.
+install(FILES packaging/copyright
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}
+)
+
+# Compresse le changelog à la configuration (gzip -9 -n pour la reproductibilité).
+find_program(GZIP_TOOL gzip)
+if(GZIP_TOOL)
+    execute_process(
+        COMMAND ${GZIP_TOOL} -9 -n -c ${CMAKE_SOURCE_DIR}/packaging/changelog.Debian
+        OUTPUT_FILE ${CMAKE_BINARY_DIR}/changelog.Debian.gz
+    )
+    install(FILES ${CMAKE_BINARY_DIR}/changelog.Debian.gz
+        DESTINATION ${CMAKE_INSTALL_DOCDIR}
+    )
+endif()
+
+# --- Paquet .deb (CPack) ----------------------------------------------------
+# Voir docs/adr/0005.
+set(CPACK_PACKAGE_NAME "grossbuch")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+set(CPACK_PACKAGE_DESCRIPTION
+    "grossbuch est une application de bureau de comptabilité personnelle.\n\
+Elle permet de saisir les dépenses par catégories et sous-catégories, de\n\
+définir des paiements récurrents reportés automatiquement, de consulter un\n\
+récapitulatif mensuel ou annuel (avec export CSV) et des graphiques annuels\n\
+superposés. Les données sont conservées dans une base SQLite locale.")
+set(CPACK_PACKAGE_CONTACT "Elena FRISON <e_gavrilova_frison@zohomail.eu>")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/ElenaFri/grossbuch")
+
+# Retire les symboles de débogage du binaire installé.
+set(CPACK_STRIP_FILES ON)
+
+set(CPACK_GENERATOR "DEB")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${CPACK_PACKAGE_CONTACT}")
+set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
+set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
+# Déduit automatiquement les dépendances runtime (libQt6...) via dpkg-shlibdeps,
+# plutôt que de figer des versions à la main. Nécessite dpkg-dev.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+# Le pilote SQLite de Qt est un plugin chargé à l'exécution (non détecté par
+# shlibdeps car non lié) : indispensable pour ouvrir la base. On l'ajoute à la
+# main ; CPack le fusionne avec les dépendances déduites.
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6sql6-sqlite")
+# Nom de fichier conventionnel : grossbuch_<version>-<release>_<arch>.deb.
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+
+include(CPack)
 
 # --- Tests ------------------------------------------------------------------
 add_subdirectory(tests)

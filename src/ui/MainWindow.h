@@ -7,23 +7,26 @@ class QTabWidget;
 
 namespace grossbuch {
 
+class Database;
 class CategoryRepository;
 class ExpenseRepository;
 class RecurringRepository;
+class DataController;
 class EntryTab;
 class RecurringTab;
 class SummaryTab;
 class ChartsTab;
+class DataTab;
 
-// Fenêtre principale : un QTabWidget à trois onglets (Saisie, Récapitulatif,
-// Graphiques). Les dépôts du cœur métier sont injectés par référence et
-// consommés par les onglets. Voir docs/adr/0004.
+// Fenêtre principale : un QTabWidget à cinq onglets (Saisie, Récurrents,
+// Récapitulatif, Graphiques, Données). Les dépôts du cœur métier sont injectés
+// par référence et consommés par les onglets. Voir docs/adr/0004.
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    MainWindow(CategoryRepository &categories, ExpenseRepository &expenses,
+    MainWindow(Database &database, CategoryRepository &categories, ExpenseRepository &expenses,
                RecurringRepository &recurring, QWidget *parent = nullptr);
 
 protected:
@@ -38,10 +41,17 @@ private slots:
     // (la matérialisation a pu créer ou retirer des occurrences).
     void onRecurringChanged();
 
+    // Redémarre l'application après une restauration de sauvegarde.
+    void onRestoreCompleted();
+
 private:
+    void refreshAllTabs();
+
+    Database &m_database;
     CategoryRepository &m_categories;
     ExpenseRepository &m_expenses;
     RecurringRepository &m_recurring;
+    DataController *m_dataController = nullptr;
 
     // Stocke l'état de l'interface (géométrie, dernier onglet) dans ~/.config,
     // séparément des données (constructeur explicite org/app : ne touche pas au
@@ -53,6 +63,7 @@ private:
     RecurringTab *m_recurringTab = nullptr;
     SummaryTab *m_summaryTab = nullptr;
     ChartsTab *m_chartsTab = nullptr;
+    DataTab *m_dataTab = nullptr;
 };
 
 } // namespace grossbuch

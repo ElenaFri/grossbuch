@@ -192,6 +192,24 @@ QSqlDatabase Database::connection() const
     return QSqlDatabase::database(m_connectionName, false);
 }
 
+QString Database::path() const
+{
+    return m_path;
+}
+
+void Database::close()
+{
+    if (QSqlDatabase::contains(m_connectionName)) {
+        // La connexion doit être détruite avant d'être retirée du registre.
+        {
+            QSqlDatabase db = QSqlDatabase::database(m_connectionName, false);
+            if (db.isOpen())
+                db.close();
+        }
+        QSqlDatabase::removeDatabase(m_connectionName);
+    }
+}
+
 bool Database::checkIntegrity() const
 {
     QSqlQuery query(connection());

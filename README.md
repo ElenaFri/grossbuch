@@ -18,12 +18,13 @@ Les choix techniques, l'architecture et le modèle de données sont documentés 
 
 ## Fonctionnalités existantes
 
-L'application s'organise autour de quatre onglets.
+L'application s'organise autour de cinq onglets.
 
 - Saisie : enregistrement d'une dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante groupée, modification et suppression d'une dépense, et liste des dépenses du mois en cours.
 - Paiements récurrents : modèles de dépenses qui reviennent chaque mois, matérialisés automatiquement sur le mois en cours, modifiables pour l'avenir seulement et désactivables ou réactivables sans perte de l'historique.
-- Récapitulatif : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général et un export CSV.
+- Récapitulatif : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général.
 - Graphiques annuels : courbes des dépenses totales mensuelles superposées d'une année sur l'autre, les trois dernières années par défaut, avec sélection des années visibles.
+- Données : export vers un fichier d'échange, import avec fusion (rapport affiché), et restauration d'une sauvegarde choisie dans la liste.
 
 Socle technique : stockage local SQLite, montants stockés en centimes pour éviter les erreurs d'arrondi, interface francophone, persistance de l'état de la fenêtre, distribution en paquet `.deb` et release GitHub automatisée sur les tags.
 
@@ -73,15 +74,15 @@ L'architecture retenue est hors ligne d'abord (offline-first). Chaque machine co
 - [x] Sauvegarde automatique horodatée par copie cohérente de la base (`VACUUM INTO`) à l'ouverture ou à la fermeture
 - [x] Rotation des sauvegardes (conserver les N plus récentes)
 - [x] Sauvegarde automatique systématique avant tout import
-- [ ] Restauration d'une sauvegarde depuis l'application
+- [x] Restauration d'une sauvegarde depuis l'application
 - [x] Documenter le schéma et le format d'échange pour la lisibilité à long terme
 
 ### v0.2.0 — Interface d'import / export
 
-- [ ] Menu ou onglet Données : exporter vers un fichier, importer depuis un fichier
-- [ ] Retour visuel du résultat de la fusion (ajouts, mises à jour, suppressions, conflits)
-- [ ] Confirmation avant import, avec rappel que la base est sauvegardée au préalable
-- [ ] Tests de l'interface (Qt Test, offscreen)
+- [x] Menu ou onglet Données : exporter vers un fichier, importer depuis un fichier
+- [x] Retour visuel du résultat de la fusion (ajouts, mises à jour, suppressions, conflits)
+- [x] Confirmation avant import, avec rappel que la base est sauvegardée au préalable
+- [x] Tests de l'interface (Qt Test, offscreen)
 
 ### v0.3.0 — Synchronisation distante semi-automatique
 

@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     grossbuch::RecurringRepository recurrings(database);
     recurrings.materializeDueOccurrences(QDate::currentDate());
 
-    grossbuch::MainWindow window(categories, expenses, recurrings);
+    grossbuch::MainWindow window(database, categories, expenses, recurrings);
     window.show();
 
     return QApplication::exec();

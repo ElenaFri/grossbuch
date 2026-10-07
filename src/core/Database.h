@@ -30,6 +30,14 @@ public:
     bool isOpen() const;
     QSqlDatabase connection() const;
 
+    // Chemin du fichier de base géré par cette instance.
+    QString path() const;
+
+    // Ferme la connexion et la retire du registre Qt, libérant le fichier (utile
+    // avant une restauration qui remplace le fichier). La base peut être
+    // rouverte ensuite par open(). Voir docs/adr/0013.
+    void close();
+
     // Contrôle d'intégrité de la base (PRAGMA integrity_check). Renvoie vrai si
     // SQLite rapporte « ok ». Utile avant une sauvegarde ou un import. Voir
     // docs/adr/0011.

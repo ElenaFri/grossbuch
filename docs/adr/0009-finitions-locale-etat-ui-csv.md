@@ -4,7 +4,7 @@ Date : 2026-10-05
 
 ## Statut
 
-Accepté
+Accepté. La décision relative à l'export CSV est remplacée par [0014 - Retrait de l'export CSV du récapitulatif](0014-retrait-export-csv.md) ; les décisions sur la locale et la persistance de l'UI restent en vigueur.
 
 ## Contexte
 

@@ -37,9 +37,9 @@ add_library(grossbuch_core STATIC
     src/core/CategoryRepository.cpp
     src/core/ExpenseRepository.cpp
     src/core/RecurringRepository.cpp
-    src/core/CsvExport.cpp
     src/core/ExchangeService.cpp
     src/core/BackupService.cpp
+    src/core/DataController.cpp
 )
 
 target_include_directories(grossbuch_core PUBLIC src)
@@ -56,6 +56,7 @@ add_library(grossbuch_ui STATIC
     src/ui/RecurringTab.cpp
     src/ui/SummaryTab.cpp
     src/ui/ChartsTab.cpp
+    src/ui/DataTab.cpp
     src/ui/UiHelpers.cpp
 )
 
@@ -125,7 +126,7 @@ set(CPACK_PACKAGE_DESCRIPTION
     "grossbuch est une application de bureau de comptabilité personnelle.\n\
 Elle permet de saisir les dépenses par catégories et sous-catégories, de\n\
 définir des paiements récurrents reportés automatiquement, de consulter un\n\
-récapitulatif mensuel ou annuel (avec export CSV) et des graphiques annuels\n\
+récapitulatif mensuel ou annuel et des graphiques annuels\n\
 superposés. Les données sont conservées dans une base SQLite locale.")
 set(CPACK_PACKAGE_CONTACT "Elena FRISON <e_gavrilova_frison@zohomail.eu>")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/ElenaFri/grossbuch")

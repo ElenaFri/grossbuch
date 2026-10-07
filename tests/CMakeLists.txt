@@ -38,6 +38,16 @@ target_compile_options(tst_backup PRIVATE
 
 add_test(NAME tst_backup COMMAND tst_backup)
 
+# Tests du contrôleur de données (Qt Test, cœur). Voir docs/adr/0012 et 0013.
+add_executable(tst_datacontroller tst_datacontroller.cpp)
+target_link_libraries(tst_datacontroller PRIVATE grossbuch_core Qt6::Test)
+
+target_compile_options(tst_datacontroller PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_datacontroller COMMAND tst_datacontroller)
+
 # Tests de l'onglet de saisie (Qt Test, Widgets). Voir Phase 4 du plan.
 add_executable(tst_entrytab tst_entrytab.cpp)
 target_link_libraries(tst_entrytab PRIVATE grossbuch_ui Qt6::Test)

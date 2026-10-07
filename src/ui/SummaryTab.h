@@ -32,7 +32,6 @@ public:
 
 private slots:
     void updateView();
-    void onExport();
 
 private:
     void populateYears();
@@ -48,10 +47,6 @@ private:
     QComboBox *m_year = nullptr;
     QTreeWidget *m_tree = nullptr;
     QLabel *m_total = nullptr;
-
-    // Montants de la période actuellement affichée, par identifiant de catégorie ;
-    // sert de source pour l'export CSV sans recalculer l'agrégation.
-    QHash<int, qint64> m_currentAmounts;
 };
 
 } // namespace grossbuch

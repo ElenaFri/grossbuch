@@ -6,6 +6,7 @@
 
 #include <QApplication>
 #include <QLocale>
+#include <QPushButton>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QTabWidget>
@@ -28,6 +29,7 @@ private slots:
 
     void lastTabIsRestored();
     void outOfRangeTabFallsBackToFirst();
+    void dataTabExposesActions();
 
 private:
     std::unique_ptr<MainWindow> makeWindow();
@@ -61,7 +63,7 @@ void UiStateTest::init()
 
 std::unique_ptr<MainWindow> UiStateTest::makeWindow()
 {
-    return std::make_unique<MainWindow>(*m_categories, *m_expenses, *m_recurring);
+    return std::make_unique<MainWindow>(*m_db, *m_categories, *m_expenses, *m_recurring);
 }
 
 void UiStateTest::lastTabIsRestored()
@@ -70,7 +72,7 @@ void UiStateTest::lastTabIsRestored()
         auto window = makeWindow();
         auto *tabs = window->findChild<QTabWidget *>();
         QVERIFY(tabs != nullptr);
-        QCOMPARE(tabs->count(), 4);
+        QCOMPARE(tabs->count(), 5);
         tabs->setCurrentIndex(2);
         // La fermeture déclenche la sauvegarde dans closeEvent.
         window->close();
@@ -95,6 +97,28 @@ void UiStateTest::outOfRangeTabFallsBackToFirst()
     auto *tabs = window->findChild<QTabWidget *>();
     QVERIFY(tabs != nullptr);
     QCOMPARE(tabs->currentIndex(), 0);
+}
+
+// L'onglet Données expose les boutons d'export, d'import et de restauration.
+void UiStateTest::dataTabExposesActions()
+{
+    auto window = makeWindow();
+
+    const QList<QPushButton *> buttons = window->findChildren<QPushButton *>();
+    bool hasExport = false;
+    bool hasImport = false;
+    bool hasRestore = false;
+    for (const QPushButton *button : buttons) {
+        if (button->text().contains(QStringLiteral("Exporter")))
+            hasExport = true;
+        if (button->text().contains(QStringLiteral("Importer")))
+            hasImport = true;
+        if (button->text().contains(QStringLiteral("Restaurer")))
+            hasRestore = true;
+    }
+    QVERIFY(hasExport);
+    QVERIFY(hasImport);
+    QVERIFY(hasRestore);
 }
 
 int main(int argc, char *argv[])

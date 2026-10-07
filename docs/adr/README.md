@@ -20,3 +20,4 @@ Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
 - [0010 - Paiements récurrents matérialisés en dépenses](0010-paiements-recurrents.md)
 - [0011 - Schéma synchronisable : identité des lignes, clé de catégorie, suppression logique et robustesse SQLite](0011-schema-synchronisable.md)
 - [0012 - Format de fichier d'échange et moteur de fusion](0012-format-echange-et-fusion.md)
+- [0013 - Sauvegardes automatiques et pérennité des données](0013-sauvegardes-et-perennite.md)

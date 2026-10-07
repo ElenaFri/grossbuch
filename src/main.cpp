@@ -1,3 +1,4 @@
+#include "core/BackupService.h"
 #include "core/CategoryRepository.h"
 #include "core/Database.h"
 #include "core/ExpenseRepository.h"
@@ -25,6 +26,14 @@ int main(int argc, char *argv[])
         QMessageBox::critical(nullptr, QStringLiteral("grossbuch"),
                               QObject::tr("Impossible d'ouvrir la base de données."));
         return 1;
+    }
+
+    // Filet de sécurité : une sauvegarde cohérente par jour, avec rotation des
+    // plus anciennes. Voir docs/adr/0013.
+    {
+        grossbuch::BackupService backups(database, grossbuch::BackupService::defaultBackupDirectory());
+        backups.dailyBackup();
+        backups.rotate();
     }
 
     grossbuch::CategoryRepository categories(database);

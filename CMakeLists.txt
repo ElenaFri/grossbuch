@@ -39,6 +39,7 @@ add_library(grossbuch_core STATIC
     src/core/RecurringRepository.cpp
     src/core/CsvExport.cpp
     src/core/ExchangeService.cpp
+    src/core/BackupService.cpp
 )
 
 target_include_directories(grossbuch_core PUBLIC src)

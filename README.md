@@ -70,11 +70,11 @@ L'architecture retenue est hors ligne d'abord (offline-first). Chaque machine co
 
 ### v0.2.0 — Sauvegardes et pérennité
 
-- [ ] Sauvegarde automatique horodatée par copie cohérente de la base (`VACUUM INTO`) à l'ouverture ou à la fermeture
-- [ ] Rotation des sauvegardes (conserver les N plus récentes)
-- [ ] Sauvegarde automatique systématique avant tout import
+- [x] Sauvegarde automatique horodatée par copie cohérente de la base (`VACUUM INTO`) à l'ouverture ou à la fermeture
+- [x] Rotation des sauvegardes (conserver les N plus récentes)
+- [x] Sauvegarde automatique systématique avant tout import
 - [ ] Restauration d'une sauvegarde depuis l'application
-- [ ] Documenter le schéma et le format d'échange pour la lisibilité à long terme
+- [x] Documenter le schéma et le format d'échange pour la lisibilité à long terme
 
 ### v0.2.0 — Interface d'import / export
 

@@ -28,6 +28,16 @@ target_compile_options(tst_exchange PRIVATE
 
 add_test(NAME tst_exchange COMMAND tst_exchange)
 
+# Tests du service de sauvegarde (Qt Test, cœur). Voir docs/adr/0013.
+add_executable(tst_backup tst_backup.cpp)
+target_link_libraries(tst_backup PRIVATE grossbuch_core Qt6::Test)
+
+target_compile_options(tst_backup PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_backup COMMAND tst_backup)
+
 # Tests de l'onglet de saisie (Qt Test, Widgets). Voir Phase 4 du plan.
 add_executable(tst_entrytab tst_entrytab.cpp)
 target_link_libraries(tst_entrytab PRIVATE grossbuch_ui Qt6::Test)

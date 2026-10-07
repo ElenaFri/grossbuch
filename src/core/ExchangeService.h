@@ -45,6 +45,13 @@ public:
 
     explicit ExchangeService(Database &database);
 
+    // Active la sauvegarde systématique de la base avant tout import (voir
+    // docs/adr/0013). Lorsqu'un répertoire est fourni, importDocument crée une
+    // sauvegarde complète puis applique la rotation avant de fusionner ; si la
+    // sauvegarde échoue, l'import est abandonné. L'application fournit toujours
+    // ce répertoire ; les tests de fusion l'omettent pour s'isoler.
+    void setBackupDirectory(const QString &directory);
+
     // Sérialise toute la base (dépenses et paiements récurrents, tombstones
     // compris) en document d'échange.
     QJsonDocument exportDocument() const;
@@ -61,6 +68,7 @@ public:
 
 private:
     Database &m_database;
+    QString m_backupDirectory;
 };
 
 } // namespace grossbuch

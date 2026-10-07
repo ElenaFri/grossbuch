@@ -1,5 +1,6 @@
 #include "core/ExchangeService.h"
 
+#include "core/BackupService.h"
 #include "core/Category.h"
 #include "core/CategoryRepository.h"
 #include "core/Database.h"
@@ -296,6 +297,11 @@ ExchangeService::ExchangeService(Database &database) : m_database(database)
 {
 }
 
+void ExchangeService::setBackupDirectory(const QString &directory)
+{
+    m_backupDirectory = directory;
+}
+
 QJsonDocument ExchangeService::exportDocument() const
 {
     QSqlDatabase db = m_database.connection();
@@ -399,6 +405,20 @@ bool ExchangeService::importDocument(const QJsonDocument &document, MergeReport 
         if (error)
             *error = QStringLiteral("Version de format non prise en charge : %1").arg(version);
         return false;
+    }
+
+    // Sauvegarde systématique avant de modifier la base en place (voir
+    // docs/adr/0013). En cas d'échec, on n'importe pas.
+    if (!m_backupDirectory.isEmpty()) {
+        BackupService backup(m_database, m_backupDirectory);
+        QString backupError;
+        if (!backup.createBackup(&backupError).has_value()) {
+            if (error)
+                *error = QStringLiteral("Sauvegarde préalable impossible, import annulé : %1")
+                             .arg(backupError);
+            return false;
+        }
+        backup.rotate();
     }
 
     QHash<QString, int> categoryByKey;

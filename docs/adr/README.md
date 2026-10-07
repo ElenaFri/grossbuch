@@ -19,3 +19,4 @@ Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
 - [0009 - Finitions : locale forcée, état de l'UI et export CSV](0009-finitions-locale-etat-ui-csv.md)
 - [0010 - Paiements récurrents matérialisés en dépenses](0010-paiements-recurrents.md)
 - [0011 - Schéma synchronisable : identité des lignes, clé de catégorie, suppression logique et robustesse SQLite](0011-schema-synchronisable.md)
+- [0012 - Format de fichier d'échange et moteur de fusion](0012-format-echange-et-fusion.md)

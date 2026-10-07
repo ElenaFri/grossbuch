@@ -188,7 +188,7 @@ int RecurringRepository::materializeDueOccurrences(const QDate &asOf)
 
             QSqlQuery insert(db);
             insert.prepare(QStringLiteral(
-                "INSERT INTO expenses(amount, date, label, category_id, recurring_id, "
+                "INSERT OR IGNORE INTO expenses(amount, date, label, category_id, recurring_id, "
                 "uuid, created_at, updated_at, deleted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 0)"));
             insert.addBindValue(model.amountCents);
             insert.addBindValue(date.toString(Qt::ISODate));
@@ -197,14 +197,17 @@ int RecurringRepository::materializeDueOccurrences(const QDate &asOf)
             insert.addBindValue(model.categoryId);
             insert.addBindValue(model.id);
             const QString now = nowTimestampUtc();
-            insert.addBindValue(newUuid());
+            insert.addBindValue(occurrenceUuid(model.uuid, year, month));
             insert.addBindValue(now);
             insert.addBindValue(now);
             if (!insert.exec()) {
                 db.rollback();
                 return 0;
             }
-            ++created;
+            // OR IGNORE : une occurrence déjà présente (générée, reçue par fusion ou
+            // supprimée en tombstone) n'est pas recréée. Voir docs/adr/0012.
+            if (insert.numRowsAffected() > 0)
+                ++created;
         }
 
         const auto [lastYear, lastMonth] = fromOrdinal(asOfOrdinal);

@@ -61,12 +61,12 @@ L'architecture retenue est hors ligne d'abord (offline-first). Chaque machine co
 
 ### v0.2.0 — Moteur d'échange et de fusion
 
-- [ ] Définir un format de fichier d'échange portable et versionné, référençant les catégories par leur clé stable et non par identifiant local
-- [ ] Export complet : dépenses et paiements récurrents, marqueurs de suppression compris, vers le fichier d'échange
-- [ ] Import avec fusion ligne par ligne par `uuid`, règle « la plus récente l'emporte », propagation des suppressions
-- [ ] Idempotence de l'import (réimporter le même fichier ne modifie rien)
-- [ ] Journaliser les conflits (la modification écrasée est consignée)
-- [ ] Tests du moteur de fusion : ajout des deux côtés, modification concurrente, suppression propagée, réimport idempotent
+- [x] Définir un format de fichier d'échange portable et versionné, référençant les catégories par leur clé stable et non par identifiant local
+- [x] Export complet : dépenses et paiements récurrents, marqueurs de suppression compris, vers le fichier d'échange
+- [x] Import avec fusion ligne par ligne par `uuid`, règle « la plus récente l'emporte », propagation des suppressions
+- [x] Idempotence de l'import (réimporter le même fichier ne modifie rien)
+- [x] Journaliser les conflits (la modification écrasée est consignée)
+- [x] Tests du moteur de fusion : ajout des deux côtés, modification concurrente, suppression propagée, réimport idempotent
 
 ### v0.2.0 — Sauvegardes et pérennité
 

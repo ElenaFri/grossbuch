@@ -22,3 +22,4 @@ Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
 - [0012 - Format de fichier d'échange et moteur de fusion](0012-format-echange-et-fusion.md)
 - [0013 - Sauvegardes automatiques et pérennité des données](0013-sauvegardes-et-perennite.md)
 - [0014 - Retrait de l'export CSV du récapitulatif](0014-retrait-export-csv.md)
+- [0015 - Dépendances .deb portables et indépendantes de la machine de build](0015-paquet-deb-portable.md)

@@ -140,13 +140,24 @@ set(CPACK_DEBIAN_PACKAGE_RELEASE "1")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "${CPACK_PACKAGE_HOMEPAGE_URL}")
-# Déduit automatiquement les dépendances runtime (libQt6...) via dpkg-shlibdeps,
-# plutôt que de figer des versions à la main. Nécessite dpkg-dev.
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-# Le pilote SQLite de Qt est un plugin chargé à l'exécution (non détecté par
-# shlibdeps car non lié) : indispensable pour ouvrir la base. On l'ajoute à la
-# main ; CPack le fusionne avec les dépendances déduites.
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "libqt6sql6-sqlite")
+# Dépendances déclarées à la main pour un paquet portable entre distributions.
+# dpkg-shlibdeps figerait les noms et versions des paquets Qt de la machine de
+# build ; or la transition « 64-bit time_t » a renommé certains paquets avec le
+# suffixe t64 de façon divergente (Debian 13 : seul libqt6core6 ; Ubuntu : core,
+# gui, sql et widgets). On le désactive et on liste des alternatives « t64 | sans
+# t64 » avec un plancher de version prudent, pour que le même .deb s'installe sur
+# Debian 12/13, LMDE, Ubuntu 22.04/24.04 et dérivés, quelle que soit la machine
+# de compilation. Le pilote SQLite de Qt est un plugin chargé à l'exécution
+# (indispensable pour ouvrir la base) et n'a pas de variante t64.
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS
+    "libc6, libstdc++6, libgcc-s1, \
+libqt6core6t64 (>= 6.2.0) | libqt6core6 (>= 6.2.0), \
+libqt6gui6t64 (>= 6.2.0) | libqt6gui6 (>= 6.2.0), \
+libqt6widgets6t64 (>= 6.2.0) | libqt6widgets6 (>= 6.2.0), \
+libqt6sql6t64 (>= 6.2.0) | libqt6sql6 (>= 6.2.0), \
+libqt6charts6 (>= 6.2.0) | libqt6charts6t64 (>= 6.2.0), \
+libqt6sql6-sqlite")
 # Nom de fichier conventionnel : grossbuch_<version>-<release>_<arch>.deb.
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 

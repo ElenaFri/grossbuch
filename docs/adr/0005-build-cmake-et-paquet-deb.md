@@ -4,7 +4,7 @@ Date : 2026-10-05
 
 ## Statut
 
-Accepté
+Accepté. La stratégie de dépendances d'exécution du paquet est précisée par [0015 - Dépendances .deb portables et indépendantes de la machine de build](0015-paquet-deb-portable.md).
 
 ## Contexte
 

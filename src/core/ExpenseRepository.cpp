@@ -1,6 +1,7 @@
 #include "core/ExpenseRepository.h"
 
 #include "core/Database.h"
+#include "core/SyncMeta.h"
 
 #include <QDate>
 #include <QSqlQuery>
@@ -34,6 +35,9 @@ Expense expenseFromQuery(const QSqlQuery &query)
     expense.date = QDate::fromString(query.value(2).toString(), Qt::ISODate);
     expense.label = query.value(3).toString();
     expense.categoryId = query.value(4).toInt();
+    expense.uuid = query.value(5).toString();
+    expense.createdAt = query.value(6).toString();
+    expense.updatedAt = query.value(7).toString();
     return expense;
 }
 
@@ -45,14 +49,19 @@ ExpenseRepository::ExpenseRepository(Database &database) : m_database(database)
 
 std::optional<int> ExpenseRepository::add(const Expense &expense)
 {
+    const QString now = nowTimestampUtc();
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
-        "INSERT INTO expenses(amount, date, label, category_id) VALUES(?, ?, ?, ?)"));
+        "INSERT INTO expenses(amount, date, label, category_id, uuid, created_at, updated_at, "
+        "deleted) VALUES(?, ?, ?, ?, ?, ?, ?, 0)"));
     query.addBindValue(expense.amountCents);
     query.addBindValue(expense.date.toString(Qt::ISODate));
     query.addBindValue(expense.label.isEmpty() ? QVariant(QMetaType(QMetaType::QString))
                                                : QVariant(expense.label));
     query.addBindValue(expense.categoryId);
+    query.addBindValue(newUuid());
+    query.addBindValue(now);
+    query.addBindValue(now);
     if (!query.exec())
         return std::nullopt;
     return query.lastInsertId().toInt();
@@ -62,20 +71,26 @@ bool ExpenseRepository::update(const Expense &expense)
 {
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
-        "UPDATE expenses SET amount = ?, date = ?, label = ?, category_id = ? WHERE id = ?"));
+        "UPDATE expenses SET amount = ?, date = ?, label = ?, category_id = ?, updated_at = ? "
+        "WHERE id = ? AND deleted = 0"));
     query.addBindValue(expense.amountCents);
     query.addBindValue(expense.date.toString(Qt::ISODate));
     query.addBindValue(expense.label.isEmpty() ? QVariant(QMetaType(QMetaType::QString))
                                                : QVariant(expense.label));
     query.addBindValue(expense.categoryId);
+    query.addBindValue(nowTimestampUtc());
     query.addBindValue(expense.id);
     return query.exec() && query.numRowsAffected() > 0;
 }
 
 bool ExpenseRepository::remove(int id)
 {
+    // Suppression logique (tombstone) : la ligne subsiste pour la synchronisation
+    // mais devient invisible aux lectures. Voir docs/adr/0011.
     QSqlQuery query(m_database.connection());
-    query.prepare(QStringLiteral("DELETE FROM expenses WHERE id = ?"));
+    query.prepare(QStringLiteral(
+        "UPDATE expenses SET deleted = 1, updated_at = ? WHERE id = ? AND deleted = 0"));
+    query.addBindValue(nowTimestampUtc());
     query.addBindValue(id);
     return query.exec() && query.numRowsAffected() > 0;
 }
@@ -86,8 +101,8 @@ QVector<Expense> ExpenseRepository::forMonth(int year, int month) const
     const auto [start, end] = monthBounds(year, month);
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
-        "SELECT id, amount, date, label, category_id FROM expenses "
-        "WHERE date >= ? AND date < ? ORDER BY date, id"));
+        "SELECT id, amount, date, label, category_id, uuid, created_at, updated_at FROM expenses "
+        "WHERE date >= ? AND date < ? AND deleted = 0 ORDER BY date, id"));
     query.addBindValue(start);
     query.addBindValue(end);
     if (!query.exec())
@@ -116,7 +131,7 @@ QVector<CategoryTotal> ExpenseRepository::totalsByCategoryBetween(const QString 
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
         "SELECT category_id, SUM(amount) FROM expenses "
-        "WHERE date >= ? AND date < ? GROUP BY category_id ORDER BY category_id"));
+        "WHERE date >= ? AND date < ? AND deleted = 0 GROUP BY category_id ORDER BY category_id"));
     query.addBindValue(start);
     query.addBindValue(end);
     if (!query.exec())
@@ -133,7 +148,7 @@ std::array<qint64, 12> ExpenseRepository::monthlyTotals(int year) const
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
         "SELECT CAST(substr(date, 6, 2) AS INTEGER) AS month, SUM(amount) FROM expenses "
-        "WHERE date >= ? AND date < ? GROUP BY month"));
+        "WHERE date >= ? AND date < ? AND deleted = 0 GROUP BY month"));
     query.addBindValue(start);
     query.addBindValue(end);
     if (!query.exec())
@@ -152,7 +167,7 @@ QVector<int> ExpenseRepository::availableYears() const
     QSqlQuery query(m_database.connection());
     if (!query.exec(QStringLiteral(
             "SELECT DISTINCT CAST(substr(date, 1, 4) AS INTEGER) AS year "
-            "FROM expenses ORDER BY year")))
+            "FROM expenses WHERE deleted = 0 ORDER BY year")))
         return years;
     while (query.next())
         years.append(query.value(0).toInt());

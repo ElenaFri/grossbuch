@@ -16,6 +16,12 @@ struct Expense
     QDate date;
     QString label;
     int categoryId = 0;
+
+    // Identité synchronisable (voir docs/adr/0011).
+    QString uuid;
+    QString createdAt;
+    QString updatedAt;
+    bool deleted = false;
 };
 
 } // namespace grossbuch

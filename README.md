@@ -52,12 +52,12 @@ L'architecture retenue est hors ligne d'abord (offline-first). Chaque machine co
 
 ### v0.2.0 — Schéma synchronisable
 
-- [ ] Ajouter au seed une clé textuelle stable par catégorie, indépendante de l'ordre d'insertion
-- [ ] Migration de schéma (v3) : ajouter `uuid` (unique), `created_at`, `updated_at` et `deleted` (tombstone) sur `expenses` et `recurring_expenses`
-- [ ] Remplir les `uuid` et les horodatages des lignes existantes lors de la migration
-- [ ] Activer le mode WAL et les clés étrangères, et exposer un contrôle d'intégrité
-- [ ] Remplacer la suppression définitive par une suppression logique (tombstone) dans les dépôts
-- [ ] Tests de migration sur un jeu de données réaliste (préservation des données, idempotence, non-régénération)
+- [x] Ajouter au seed une clé textuelle stable par catégorie, indépendante de l'ordre d'insertion
+- [x] Migration de schéma (v3) : ajouter `uuid` (unique), `created_at`, `updated_at` et `deleted` (tombstone) sur `expenses` et `recurring_expenses`
+- [x] Remplir les `uuid` et les horodatages des lignes existantes lors de la migration
+- [x] Activer le mode WAL et les clés étrangères, et exposer un contrôle d'intégrité
+- [x] Remplacer la suppression définitive par une suppression logique (tombstone) dans les dépôts
+- [x] Tests de migration sur un jeu de données réaliste (préservation des données, idempotence, non-régénération)
 
 ### v0.2.0 — Moteur d'échange et de fusion
 

@@ -23,6 +23,13 @@ struct RecurringExpense
     bool active = true;
     int lastYear = 0;  // dernier mois matérialisé (0 = aucun)
     int lastMonth = 0;
+
+    // Identité synchronisable (voir docs/adr/0011). Un modèle ne se supprime pas
+    // (il se désactive) : deleted reste faux côté application.
+    QString uuid;
+    QString createdAt;
+    QString updatedAt;
+    bool deleted = false;
 };
 
 } // namespace grossbuch

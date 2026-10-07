@@ -4,6 +4,7 @@
 #include "core/RecurringExpense.h"
 #include "core/RecurringRepository.h"
 
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -40,6 +41,10 @@ private slots:
     void materializeIgnoresFutureStartModel();
     void materializeSkipsInactiveModel();
     void materializeNeverRegeneratesDeletedOrPastMonths();
+
+    void addAssignsSyncIdentity();
+    void materializedOccurrenceCarriesSyncIdentity();
+    void updateRefreshesTimestamp();
 
 private:
     int categoryId(const QString &name) const;
@@ -257,7 +262,7 @@ void RecurringTest::reopeningKeepsSchemaAndData()
         savedId = *id;
     }
 
-    // Réouverture du même fichier : le schéma v2 est en place et la donnée persiste.
+    // Réouverture du même fichier : le schéma est en place et la donnée persiste.
     {
         Database db(path, QStringLiteral("recreopen"));
         QVERIFY(db.open());
@@ -372,6 +377,59 @@ void RecurringTest::materializeNeverRegeneratesDeletedOrPastMonths()
     QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 4, 10)), 1);
     QCOMPARE(m_expenses->forMonth(2025, 4).size(), 1);
     QVERIFY(m_expenses->forMonth(2025, 2).isEmpty());
+}
+
+void RecurringTest::addAssignsSyncIdentity()
+{
+    const std::optional<int> id = m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+    QVERIFY(id.has_value());
+    const std::optional<RecurringExpense> stored = m_recurring->byId(*id);
+    QVERIFY(stored.has_value());
+    QVERIFY(!stored->uuid.isEmpty());
+    QVERIFY(!stored->createdAt.isEmpty());
+    QCOMPARE(stored->createdAt, stored->updatedAt); // égaux à la création
+    QVERIFY(!stored->deleted);
+}
+
+void RecurringTest::materializedOccurrenceCarriesSyncIdentity()
+{
+    m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+    QCOMPARE(m_recurring->materializeDueOccurrences(QDate(2025, 1, 20)), 1);
+
+    // Une occurrence matérialisée est une dépense synchronisable à part entière.
+    const QVector<Expense> january = m_expenses->forMonth(2025, 1);
+    QCOMPARE(january.size(), 1);
+    QVERIFY(!january.first().uuid.isEmpty());
+    QVERIFY(!january.first().createdAt.isEmpty());
+    QVERIFY(!january.first().updatedAt.isEmpty());
+}
+
+void RecurringTest::updateRefreshesTimestamp()
+{
+    const std::optional<int> id = m_recurring->add(makeSample(QStringLiteral("Loyer"), 2025, 1));
+    QVERIFY(id.has_value());
+
+    // Horodatage ancien planté : modifier le modèle doit le rafraîchir pour que le
+    // changement soit synchronisable (« la plus récente l'emporte »).
+    {
+        QSqlQuery seed(m_db->connection());
+        seed.prepare(QStringLiteral(
+            "UPDATE recurring_expenses SET updated_at = ? WHERE id = ?"));
+        seed.addBindValue(QStringLiteral("2000-01-01T00:00:00"));
+        seed.addBindValue(*id);
+        QVERIFY(seed.exec());
+    }
+
+    RecurringExpense edited = *m_recurring->byId(*id);
+    QCOMPARE(edited.updatedAt, QStringLiteral("2000-01-01T00:00:00"));
+    edited.amountCents = 90000;
+    QVERIFY(m_recurring->update(edited));
+
+    const std::optional<RecurringExpense> stored = m_recurring->byId(*id);
+    QVERIFY(stored.has_value());
+    QVERIFY(stored->updatedAt > QStringLiteral("2000-01-01T00:00:00"));
+    QCOMPARE(stored->createdAt, edited.createdAt); // la création ne bouge pas
+    QCOMPARE(stored->uuid, edited.uuid);           // l'identité reste stable
 }
 
 QTEST_GUILESS_MAIN(RecurringTest)

@@ -1,6 +1,7 @@
 #include "core/RecurringRepository.h"
 
 #include "core/Database.h"
+#include "core/SyncMeta.h"
 
 #include <QDate>
 #include <QSqlQuery>
@@ -43,11 +44,15 @@ RecurringExpense recurringFromQuery(const QSqlQuery &query)
     recurring.active = query.value(7).toInt() != 0;
     recurring.lastYear = query.value(8).toInt();
     recurring.lastMonth = query.value(9).toInt();
+    recurring.uuid = query.value(10).toString();
+    recurring.createdAt = query.value(11).toString();
+    recurring.updatedAt = query.value(12).toString();
     return recurring;
 }
 
 constexpr auto kSelectColumns = "id, amount, label, category_id, day_of_month, "
-                                "start_year, start_month, active, last_year, last_month";
+                                "start_year, start_month, active, last_year, last_month, "
+                                "uuid, created_at, updated_at";
 
 } // namespace
 
@@ -61,11 +66,12 @@ std::optional<int> RecurringRepository::add(const RecurringExpense &recurring)
     // rattrape l'historique depuis le mois de début (voir docs/adr/0010).
     const auto [lastYear, lastMonth] = previousMonth(recurring.startYear, recurring.startMonth);
 
+    const QString now = nowTimestampUtc();
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
         "INSERT INTO recurring_expenses(amount, label, category_id, day_of_month, "
-        "start_year, start_month, active, last_year, last_month) "
-        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        "start_year, start_month, active, last_year, last_month, uuid, created_at, updated_at, "
+        "deleted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)"));
     query.addBindValue(recurring.amountCents);
     query.addBindValue(recurring.label.isEmpty() ? QVariant(QMetaType(QMetaType::QString))
                                                  : QVariant(recurring.label));
@@ -76,6 +82,9 @@ std::optional<int> RecurringRepository::add(const RecurringExpense &recurring)
     query.addBindValue(recurring.active ? 1 : 0);
     query.addBindValue(lastYear);
     query.addBindValue(lastMonth);
+    query.addBindValue(newUuid());
+    query.addBindValue(now);
+    query.addBindValue(now);
     if (!query.exec())
         return std::nullopt;
     return query.lastInsertId().toInt();
@@ -88,12 +97,13 @@ bool RecurringRepository::update(const RecurringExpense &recurring)
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
         "UPDATE recurring_expenses SET amount = ?, label = ?, category_id = ?, "
-        "day_of_month = ? WHERE id = ?"));
+        "day_of_month = ?, updated_at = ? WHERE id = ? AND deleted = 0"));
     query.addBindValue(recurring.amountCents);
     query.addBindValue(recurring.label.isEmpty() ? QVariant(QMetaType(QMetaType::QString))
                                                  : QVariant(recurring.label));
     query.addBindValue(recurring.categoryId);
     query.addBindValue(recurring.dayOfMonth);
+    query.addBindValue(nowTimestampUtc());
     query.addBindValue(recurring.id);
     return query.exec() && query.numRowsAffected() > 0;
 }
@@ -101,7 +111,9 @@ bool RecurringRepository::update(const RecurringExpense &recurring)
 bool RecurringRepository::deactivate(int id)
 {
     QSqlQuery query(m_database.connection());
-    query.prepare(QStringLiteral("UPDATE recurring_expenses SET active = 0 WHERE id = ?"));
+    query.prepare(QStringLiteral(
+        "UPDATE recurring_expenses SET active = 0, updated_at = ? WHERE id = ? AND deleted = 0"));
+    query.addBindValue(nowTimestampUtc());
     query.addBindValue(id);
     return query.exec() && query.numRowsAffected() > 0;
 }
@@ -114,9 +126,11 @@ bool RecurringRepository::reactivate(int id, const QDate &asOf)
 
     QSqlQuery query(m_database.connection());
     query.prepare(QStringLiteral(
-        "UPDATE recurring_expenses SET active = 1, last_year = ?, last_month = ? WHERE id = ?"));
+        "UPDATE recurring_expenses SET active = 1, last_year = ?, last_month = ?, updated_at = ? "
+        "WHERE id = ? AND deleted = 0"));
     query.addBindValue(lastYear);
     query.addBindValue(lastMonth);
+    query.addBindValue(nowTimestampUtc());
     query.addBindValue(id);
     return query.exec() && query.numRowsAffected() > 0;
 }
@@ -125,7 +139,8 @@ QVector<RecurringExpense> RecurringRepository::all() const
 {
     QVector<RecurringExpense> recurrings;
     QSqlQuery query(m_database.connection());
-    if (!query.exec(QStringLiteral("SELECT %1 FROM recurring_expenses ORDER BY label, id")
+    if (!query.exec(QStringLiteral("SELECT %1 FROM recurring_expenses WHERE deleted = 0 "
+                                   "ORDER BY label, id")
                         .arg(QLatin1String(kSelectColumns))))
         return recurrings;
     while (query.next())
@@ -136,7 +151,7 @@ QVector<RecurringExpense> RecurringRepository::all() const
 std::optional<RecurringExpense> RecurringRepository::byId(int id) const
 {
     QSqlQuery query(m_database.connection());
-    query.prepare(QStringLiteral("SELECT %1 FROM recurring_expenses WHERE id = ?")
+    query.prepare(QStringLiteral("SELECT %1 FROM recurring_expenses WHERE id = ? AND deleted = 0")
                       .arg(QLatin1String(kSelectColumns)));
     query.addBindValue(id);
     if (!query.exec() || !query.next())
@@ -173,14 +188,18 @@ int RecurringRepository::materializeDueOccurrences(const QDate &asOf)
 
             QSqlQuery insert(db);
             insert.prepare(QStringLiteral(
-                "INSERT INTO expenses(amount, date, label, category_id, recurring_id) "
-                "VALUES(?, ?, ?, ?, ?)"));
+                "INSERT INTO expenses(amount, date, label, category_id, recurring_id, "
+                "uuid, created_at, updated_at, deleted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 0)"));
             insert.addBindValue(model.amountCents);
             insert.addBindValue(date.toString(Qt::ISODate));
             insert.addBindValue(model.label.isEmpty() ? QVariant(QMetaType(QMetaType::QString))
                                                       : QVariant(model.label));
             insert.addBindValue(model.categoryId);
             insert.addBindValue(model.id);
+            const QString now = nowTimestampUtc();
+            insert.addBindValue(newUuid());
+            insert.addBindValue(now);
+            insert.addBindValue(now);
             if (!insert.exec()) {
                 db.rollback();
                 return 0;

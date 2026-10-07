@@ -4,7 +4,11 @@
 #include "core/Expense.h"
 #include "core/ExpenseRepository.h"
 
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSet>
 #include <QTemporaryDir>
+#include <QVariant>
 #include <QtTest>
 
 #include <memory>
@@ -39,6 +43,15 @@ private slots:
     void csvHeaderAndEmptyTotal();
     void csvRowsUseRootAndChildNames();
     void csvOmitsZeroAndFormatsDecimals();
+
+    void categoriesHaveStableKeys();
+    void addAssignsSyncIdentity();
+    void uuidsAreUnique();
+    void removeIsLogicalAndKeepsTombstone();
+    void deletedExpensesAreExcludedFromAggregations();
+    void updateRefreshesTimestampAndRejectsDeleted();
+    void integrityCheckPassesOnHealthyBase();
+    void migratesV2BaseToSynchronizableSchema();
 
 private:
     int categoryId(const QString &name) const;
@@ -488,6 +501,258 @@ void CoreTest::csvOmitsZeroAndFormatsDecimals()
     QCOMPARE(lines.at(1), QStringLiteral("Alimentation;Courses;1234,56"));
     QVERIFY(!csv.contains(QStringLiteral("Restaurants")));
     QCOMPARE(lines.at(2), QStringLiteral("Total;;1234,56"));
+}
+
+void CoreTest::categoriesHaveStableKeys()
+{
+    const QVector<Category> all = m_categories->all();
+    QSet<QString> keys;
+    for (const Category &category : all) {
+        QVERIFY(!category.key.isEmpty());
+        keys.insert(category.key);
+    }
+    QCOMPARE(keys.size(), all.size()); // toutes les clés sont distinctes
+
+    const auto keyOf = [&all](const QString &name) {
+        for (const Category &category : all) {
+            if (category.name == name)
+                return category.key;
+        }
+        return QString();
+    };
+    // Une racine, une sous-catégorie préfixée par sa racine, une racine sans enfant.
+    QCOMPARE(keyOf(QStringLiteral("Alimentation")), QStringLiteral("alimentation"));
+    QCOMPARE(keyOf(QStringLiteral("Courses")), QStringLiteral("alimentation.courses"));
+    QCOMPARE(keyOf(QStringLiteral("Résidence principale")),
+             QStringLiteral("maison.residence-principale"));
+    QCOMPARE(keyOf(QStringLiteral("Voyages")), QStringLiteral("voyages"));
+}
+
+void CoreTest::addAssignsSyncIdentity()
+{
+    Expense expense;
+    expense.amountCents = 700;
+    expense.date = QDate(2025, 2, 2);
+    expense.categoryId = categoryId(QStringLiteral("Courses"));
+    QVERIFY(m_expenses->add(expense).has_value());
+
+    const QVector<Expense> february = m_expenses->forMonth(2025, 2);
+    QCOMPARE(february.size(), 1);
+    QVERIFY(!february.first().uuid.isEmpty());
+    QVERIFY(!february.first().createdAt.isEmpty());
+    // À la création, création et dernière modification coïncident.
+    QCOMPARE(february.first().createdAt, february.first().updatedAt);
+    QVERIFY(!february.first().deleted);
+}
+
+void CoreTest::uuidsAreUnique()
+{
+    const int courses = categoryId(QStringLiteral("Courses"));
+    auto addOne = [this, courses](const QDate &date) {
+        Expense expense;
+        expense.amountCents = 100;
+        expense.date = date;
+        expense.categoryId = courses;
+        return m_expenses->add(expense);
+    };
+    QVERIFY(addOne(QDate(2025, 1, 1)).has_value());
+    QVERIFY(addOne(QDate(2025, 1, 2)).has_value());
+
+    const QVector<Expense> january = m_expenses->forMonth(2025, 1);
+    QCOMPARE(january.size(), 2);
+    QVERIFY(!january.at(0).uuid.isEmpty());
+    QVERIFY(january.at(0).uuid != january.at(1).uuid);
+}
+
+void CoreTest::removeIsLogicalAndKeepsTombstone()
+{
+    Expense expense;
+    expense.amountCents = 1000;
+    expense.date = QDate(2025, 9, 3);
+    expense.categoryId = categoryId(QStringLiteral("Courses"));
+    const std::optional<int> id = m_expenses->add(expense);
+    QVERIFY(id.has_value());
+
+    QVERIFY(m_expenses->remove(*id));
+    // Invisible aux lectures.
+    QVERIFY(m_expenses->forMonth(2025, 9).isEmpty());
+
+    // Mais la ligne subsiste, marquée supprimée (tombstone) et horodatée, pour
+    // pouvoir propager la suppression lors d'une future fusion.
+    QSqlQuery query(m_db->connection());
+    query.prepare(QStringLiteral("SELECT deleted, updated_at FROM expenses WHERE id = ?"));
+    query.addBindValue(*id);
+    QVERIFY(query.exec() && query.next());
+    QCOMPARE(query.value(0).toInt(), 1);
+    QVERIFY(!query.value(1).toString().isEmpty());
+}
+
+void CoreTest::deletedExpensesAreExcludedFromAggregations()
+{
+    const int courses = categoryId(QStringLiteral("Courses"));
+    auto addOne = [this, courses](qint64 cents, const QDate &date) {
+        Expense expense;
+        expense.amountCents = cents;
+        expense.date = date;
+        expense.categoryId = courses;
+        return m_expenses->add(expense);
+    };
+    const std::optional<int> kept = addOne(1000, QDate(2025, 4, 1));
+    const std::optional<int> dropped = addOne(2500, QDate(2025, 4, 2));
+    QVERIFY(kept.has_value() && dropped.has_value());
+    QVERIFY(m_expenses->remove(*dropped));
+
+    // La dépense supprimée ne compte plus dans aucune vue ni agrégation.
+    QCOMPARE(m_expenses->forMonth(2025, 4).size(), 1);
+    const QVector<CategoryTotal> totals = m_expenses->totalsByCategory(2025, 4);
+    QCOMPARE(totals.size(), 1);
+    QCOMPARE(totals.first().amountCents, qint64(1000));
+    QCOMPARE(m_expenses->totalsByCategoryForYear(2025).first().amountCents, qint64(1000));
+    QCOMPARE(m_expenses->monthlyTotals(2025)[3], qint64(1000)); // avril
+}
+
+void CoreTest::updateRefreshesTimestampAndRejectsDeleted()
+{
+    Expense expense;
+    expense.amountCents = 1000;
+    expense.date = QDate(2025, 5, 5);
+    expense.categoryId = categoryId(QStringLiteral("Courses"));
+    const std::optional<int> id = m_expenses->add(expense);
+    QVERIFY(id.has_value());
+
+    // On plante un horodatage ancien pour vérifier que update() le rafraîchit, sans
+    // dépendre de la résolution de l'horloge réelle.
+    {
+        QSqlQuery seed(m_db->connection());
+        seed.prepare(QStringLiteral("UPDATE expenses SET updated_at = ? WHERE id = ?"));
+        seed.addBindValue(QStringLiteral("2000-01-01T00:00:00"));
+        seed.addBindValue(*id);
+        QVERIFY(seed.exec());
+    }
+    const Expense before = m_expenses->forMonth(2025, 5).first();
+    QCOMPARE(before.updatedAt, QStringLiteral("2000-01-01T00:00:00"));
+
+    Expense edited = before;
+    edited.amountCents = 1200;
+    QVERIFY(m_expenses->update(edited));
+
+    const Expense after = m_expenses->forMonth(2025, 5).first();
+    QCOMPARE(after.amountCents, qint64(1200));
+    QVERIFY(after.updatedAt > before.updatedAt); // la modification est horodatée
+    QCOMPARE(after.createdAt, before.createdAt);  // la création ne bouge pas
+    QCOMPARE(after.uuid, before.uuid);            // l'identité reste stable
+
+    // Une dépense supprimée (tombstone) ne peut plus être modifiée.
+    QVERIFY(m_expenses->remove(*id));
+    Expense ghost = after;
+    ghost.amountCents = 9999;
+    QVERIFY(!m_expenses->update(ghost));
+}
+
+void CoreTest::integrityCheckPassesOnHealthyBase()
+{
+    QVERIFY(m_db->checkIntegrity());
+}
+
+void CoreTest::migratesV2BaseToSynchronizableSchema()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("v2.db"));
+
+    // Construit à la main une base au schéma v2 (sans identité synchronisable),
+    // avec un petit jeu de données réaliste et des catégories aux vrais noms.
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                                    QStringLiteral("v2build"));
+        db.setDatabaseName(path);
+        QVERIFY(db.open());
+        QSqlQuery q(db);
+        QVERIFY(q.exec(QStringLiteral(
+            "CREATE TABLE categories (id INTEGER PRIMARY KEY, name TEXT NOT NULL, "
+            "parent_id INTEGER REFERENCES categories(id))")));
+        QVERIFY(q.exec(QStringLiteral(
+            "CREATE TABLE expenses (id INTEGER PRIMARY KEY, amount INTEGER NOT NULL, "
+            "date TEXT NOT NULL, label TEXT, category_id INTEGER NOT NULL, recurring_id INTEGER)")));
+        QVERIFY(q.exec(QStringLiteral(
+            "CREATE TABLE recurring_expenses (id INTEGER PRIMARY KEY, amount INTEGER NOT NULL, "
+            "label TEXT, category_id INTEGER NOT NULL, day_of_month INTEGER NOT NULL, "
+            "start_year INTEGER NOT NULL, start_month INTEGER NOT NULL, "
+            "active INTEGER NOT NULL DEFAULT 1, last_year INTEGER NOT NULL DEFAULT 0, "
+            "last_month INTEGER NOT NULL DEFAULT 0)")));
+        QVERIFY(q.exec(QStringLiteral(
+            "INSERT INTO categories(id, name, parent_id) VALUES(1, 'Alimentation', NULL)")));
+        QVERIFY(q.exec(QStringLiteral(
+            "INSERT INTO categories(id, name, parent_id) VALUES(2, 'Courses', 1)")));
+        QVERIFY(q.exec(QStringLiteral(
+            "INSERT INTO categories(id, name, parent_id) VALUES(3, 'Voyages', NULL)")));
+        QVERIFY(q.exec(QStringLiteral(
+            "INSERT INTO expenses(amount, date, label, category_id) "
+            "VALUES(1500, '2025-03-10', 'Marché', 2)")));
+        QVERIFY(q.exec(QStringLiteral(
+            "INSERT INTO expenses(amount, date, label, category_id) "
+            "VALUES(8000, '2025-07-01', NULL, 3)")));
+        QVERIFY(q.exec(QStringLiteral(
+            "INSERT INTO recurring_expenses(amount, label, category_id, day_of_month, "
+            "start_year, start_month) VALUES(5000, 'Abonnement', 2, 5, 2025, 1)")));
+        QVERIFY(q.exec(QStringLiteral("PRAGMA user_version = 2")));
+        q.finish();
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(QStringLiteral("v2build"));
+
+    QString migratedUuid;
+    // Ouverture par le code courant : la migration v3 doit s'appliquer.
+    {
+        Database db(path, QStringLiteral("v2open"));
+        QVERIFY(db.open());
+        QVERIFY(db.checkIntegrity());
+
+        // Données préservées.
+        ExpenseRepository expenses(db);
+        const QVector<Expense> march = expenses.forMonth(2025, 3);
+        QCOMPARE(march.size(), 1);
+        QCOMPARE(march.first().amountCents, qint64(1500));
+        QCOMPARE(march.first().label, QStringLiteral("Marché"));
+        // Identité synchronisable attribuée aux lignes existantes.
+        QVERIFY(!march.first().uuid.isEmpty());
+        QVERIFY(!march.first().createdAt.isEmpty());
+        QVERIFY(!march.first().updatedAt.isEmpty());
+        migratedUuid = march.first().uuid;
+
+        // Clés de catégorie remplies par correspondance de nom et de hiérarchie.
+        CategoryRepository categories(db);
+        const QVector<Category> all = categories.all();
+        QCOMPARE(all.size(), 3); // pas de re-seed : les catégories existaient déjà
+        const auto keyOf = [&all](const QString &name) {
+            for (const Category &category : all) {
+                if (category.name == name)
+                    return category.key;
+            }
+            return QString();
+        };
+        QCOMPARE(keyOf(QStringLiteral("Alimentation")), QStringLiteral("alimentation"));
+        QCOMPARE(keyOf(QStringLiteral("Courses")), QStringLiteral("alimentation.courses"));
+        QCOMPARE(keyOf(QStringLiteral("Voyages")), QStringLiteral("voyages"));
+
+        // uuid uniques et présents sur les deux dépenses migrées.
+        QSqlQuery check(db.connection());
+        QVERIFY(check.exec(QStringLiteral(
+            "SELECT COUNT(DISTINCT uuid), COUNT(*) FROM expenses")));
+        QVERIFY(check.next());
+        QCOMPARE(check.value(1).toInt(), 2);
+        QCOMPARE(check.value(0).toInt(), 2);
+    }
+
+    // Réouverture : la migration ne se rejoue pas et ne régénère pas l'identité.
+    {
+        Database db(path, QStringLiteral("v2reopen"));
+        QVERIFY(db.open());
+        ExpenseRepository expenses(db);
+        const QVector<Expense> march = expenses.forMonth(2025, 3);
+        QCOMPARE(march.size(), 1);
+        QCOMPARE(march.first().uuid, migratedUuid); // identité stable d'une ouverture à l'autre
+    }
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

@@ -11,7 +11,7 @@ class Database
 {
 public:
     // Version du schéma gérée par le code courant.
-    static constexpr int schemaVersion = 2;
+    static constexpr int schemaVersion = 3;
 
     // Chemin du fichier de base dans le répertoire de données standard de
     // l'utilisateur (ex. ~/.local/share/grossbuch/grossbuch.db).
@@ -29,6 +29,11 @@ public:
 
     bool isOpen() const;
     QSqlDatabase connection() const;
+
+    // Contrôle d'intégrité de la base (PRAGMA integrity_check). Renvoie vrai si
+    // SQLite rapporte « ok ». Utile avant une sauvegarde ou un import. Voir
+    // docs/adr/0011.
+    bool checkIntegrity() const;
 
 private:
     bool applyMigrations();

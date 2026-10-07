@@ -8,24 +8,24 @@ On est dans une approche minimaliste et optimisée.
 
 ## Sommaire
 
-- [Fonctionnalités cibles](#fonctionnalités-cibles)
+- [Fonctionnalités existantes](#fonctionnalités-existantes)
 - [Catégories](#catégories)
-- [Plan de développement](#plan-de-développement)
+- [Feuille de route](#feuille-de-route)
 - [Construire le projet](#construire-le-projet)
 - [Générer le paquet `.deb`](#générer-le-paquet-deb)
 
 Les choix techniques, l'architecture et le modèle de données sont documentés sous forme d'ADR (Architecture Decision Records) dans [docs/adr/](docs/adr/).
 
-## Fonctionnalités cibles
+## Fonctionnalités existantes
 
-L'application s'organise autour de quatre onglets :
+L'application s'organise autour de quatre onglets.
 
-1. Accueil / Saisie : un formulaire pour enregistrer la prochaine dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante.
-2. Paiements récurrents : les dépenses qui reviennent chaque mois (loyer, abonnements, assurances), définies une fois comme modèles et reportées automatiquement sur le mois en cours, modifiables pour l'avenir et désactivables à tout moment sans perte de l'historique.
-3. Récapitulatif : un tableau agrégé par catégorie (avec le détail par sous-catégorie) et un total général, pour un mois ou une année entière au choix (par défaut le mois en cours).
-4. Graphiques annuels : courbes des dépenses totales (toutes catégories confondues) de toutes les années enregistrées, superposées, pour comparer les mois d'une année à l'autre.
+- Saisie : enregistrement d'une dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante groupée, modification et suppression d'une dépense, et liste des dépenses du mois en cours.
+- Paiements récurrents : modèles de dépenses qui reviennent chaque mois, matérialisés automatiquement sur le mois en cours, modifiables pour l'avenir seulement et désactivables ou réactivables sans perte de l'historique.
+- Récapitulatif : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général et un export CSV.
+- Graphiques annuels : courbes des dépenses totales mensuelles superposées d'une année sur l'autre, les trois dernières années par défaut, avec sélection des années visibles.
 
----
+Socle technique : stockage local SQLite, montants stockés en centimes pour éviter les erreurs d'arrondi, interface francophone, persistance de l'état de la fenêtre, distribution en paquet `.deb` et release GitHub automatisée sur les tags.
 
 ## Catégories
 
@@ -44,105 +44,55 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 
 > Le récapitulatif agrège par catégorie racine (avec détail par sous-catégorie), au mois ou à l'année. Les graphiques annuels n'utilisent que le total général.
 
-## Plan de développement
+## Feuille de route
 
-### Phase 0 — Mise en place du projet
-- [x] Initialiser l'arborescence (`src/`, `tests/`, `cmake/`, `packaging/`)
-- [x] Écrire le `CMakeLists.txt` racine (C++17, détection de Qt6)
-- [x] Configurer `clang-format` et `clang-tidy`
-- [x] Vérifier un build « Hello Qt » minimal (fenêtre vide)
-- [x] Documenter les dépendances de build (Qt6 Widgets, Sql, Charts, Test)
+Prochain objectif : rendre les données pérennes et transmissibles, de sorte que plusieurs personnes d'un même foyer puissent utiliser l'application avec les mêmes données, chacune sur son ordinateur.
 
-### Phase 1 — Cœur métier (core)
-- [x] Modéliser `Category` (id, nom, parent)
-- [x] Modéliser `Expense` (montant en centimes, date, libellé, catégorie)
-- [x] Implémenter `Database` (ouverture SQLite, création du schéma)
-- [x] Gérer la versioning / migration du schéma
-- [x] Implémenter le seed des catégories au premier lancement
-- [x] Implémenter `ExpenseRepository` : ajouter une dépense
-- [x] `ExpenseRepository` : modifier une dépense existante
-- [x] `ExpenseRepository` : supprimer une dépense
-- [x] `ExpenseRepository` : lister les dépenses d'un mois donné
-- [x] `ExpenseRepository` : agrégation par catégorie sur un mois donné
-- [x] `ExpenseRepository` : total par mois pour une année donnée
-- [x] `ExpenseRepository` : liste des années disponibles
+L'architecture retenue est hors ligne d'abord (offline-first). Chaque machine conserve sa propre base locale ; on n'échange jamais la base vivante, mais des instantanés d'échange que l'on fusionne dans chaque base. La fusion se fait ligne par ligne par identifiant unique, selon la règle « la modification la plus récente l'emporte », et les suppressions se propagent par marqueurs de suppression logique. Cette approche fonctionne sans serveur, reste fiable même si les deux personnes saisissent chacune de leur côté, et le fichier d'échange sert aussi de sauvegarde.
 
-### Phase 2 — Tests unitaires du core
-- [x] Mettre en place Qt Test dans CMake (`ctest`)
-- [x] Tester l'insertion et la relecture d'une dépense
-- [x] Tester la modification et la suppression d'une dépense
-- [x] Tester les agrégations mensuelles par catégorie
-- [x] Tester le total mensuel / annuel
-- [x] Tester les montants en centimes (pas d'erreur d'arrondi)
+### v0.2.0 — Schéma synchronisable
 
-### Phase 3 — Interface : fenêtre principale
-- [x] Créer `MainWindow` avec un `QTabWidget` à 3 onglets
-- [x] Mettre en place l'icône, le titre et la taille par défaut
-- [x] Injecter le `core` (repository) dans l'UI
+- [ ] Ajouter au seed une clé textuelle stable par catégorie, indépendante de l'ordre d'insertion
+- [ ] Migration de schéma (v3) : ajouter `uuid` (unique), `created_at`, `updated_at` et `deleted` (tombstone) sur `expenses` et `recurring_expenses`
+- [ ] Remplir les `uuid` et les horodatages des lignes existantes lors de la migration
+- [ ] Activer le mode WAL et les clés étrangères, et exposer un contrôle d'intégrité
+- [ ] Remplacer la suppression définitive par une suppression logique (tombstone) dans les dépôts
+- [ ] Tests de migration sur un jeu de données réaliste (préservation des données, idempotence, non-régénération)
 
-### Phase 4 — Onglet Saisie
-- [x] Champ montant (validation numérique, format monétaire)
-- [x] Sélecteur de date (par défaut : aujourd'hui)
-- [x] Champ libellé optionnel
-- [x] Liste déroulante des catégories sélectionnables (sous-catégories, ou catégorie racine si elle n'a pas d'enfant), groupées par catégorie racine
-- [x] Bouton « Enregistrer » + feedback de confirmation
-- [x] Liste des dépenses du mois en cours sous le formulaire
-- [x] Modifier une dépense sélectionnée dans la liste
-- [x] Supprimer une dépense sélectionnée (avec confirmation)
-- [x] Rafraîchir les autres onglets après ajout, modification ou suppression
+### v0.2.0 — Moteur d'échange et de fusion
 
-### Phase 5 — Onglet Récapitulatif
-- [x] Sélecteur de période : un mois ou une année entière, au choix (par défaut : mois en cours)
-- [x] Tableau par catégorie racine avec sous-totaux par sous-catégorie
-- [x] Ligne de total général de la période
-- [x] Mise en forme monétaire (€, séparateurs de milliers)
+- [ ] Définir un format de fichier d'échange portable et versionné, référençant les catégories par leur clé stable et non par identifiant local
+- [ ] Export complet : dépenses et paiements récurrents, marqueurs de suppression compris, vers le fichier d'échange
+- [ ] Import avec fusion ligne par ligne par `uuid`, règle « la plus récente l'emporte », propagation des suppressions
+- [ ] Idempotence de l'import (réimporter le même fichier ne modifie rien)
+- [ ] Journaliser les conflits (la modification écrasée est consignée)
+- [ ] Tests du moteur de fusion : ajout des deux côtés, modification concurrente, suppression propagée, réimport idempotent
 
-### Phase 6 — Onglet Graphiques annuels
-- [x] Intégrer Qt Charts
-- [x] Une courbe par année (12 points = 12 mois), superposées
-- [x] Afficher les trois dernières années par défaut
-- [x] Sélecteur pour ajuster les années visibles
-- [x] Légende, axes (mois en abscisse, montant en ordonnée)
-- [x] Afficher uniquement le total mensuel (toutes catégories)
-- [x] Rafraîchissement automatique à l'ajout d'une dépense
+### v0.2.0 — Sauvegardes et pérennité
 
-### Phase 7 — Finitions & robustesse
-- [x] Gestion des erreurs (base inaccessible, saisie invalide)
-- [x] Localisation FR (format de dates/montants via `QLocale`)
-- [x] Persistance de l'état de l'UI (dernier onglet, taille fenêtre)
-- [x] (Optionnel) Export CSV du récapitulatif
+- [ ] Sauvegarde automatique horodatée par copie cohérente de la base (`VACUUM INTO`) à l'ouverture ou à la fermeture
+- [ ] Rotation des sauvegardes (conserver les N plus récentes)
+- [ ] Sauvegarde automatique systématique avant tout import
+- [ ] Restauration d'une sauvegarde depuis l'application
+- [ ] Documenter le schéma et le format d'échange pour la lisibilité à long terme
 
-### Phase 8 — Onglet Paiements récurrents
-- [x] Migration du schéma en version 2 (table `recurring_expenses`, colonne `recurring_id` sur `expenses`)
-- [x] Modéliser `RecurringExpense` (montant par défaut, catégorie, libellé, jour du mois, mois de début, actif)
-- [x] `RecurringRepository` : créer, modifier (montant/catégorie/libellé/jour, pour l'avenir uniquement), lister
-- [x] `RecurringRepository` : désactiver / réactiver un paiement (jamais de suppression, l'historique est conservé)
-- [x] Matérialisation automatique au lancement : occurrences manquantes du mois de début (rattrapage à la création) jusqu'au mois en cours, repère idempotent, jamais de recréation d'une occurrence supprimée, aucun mois futur
-- [x] Les occurrences générées sont de vraies dépenses (comptées dans Saisie, Récapitulatif et Graphiques) et ajustables à la main dans l'onglet Saisie
-- [x] Tests unitaires du core (matérialisation, idempotence, rattrapage initial, non-régénération du passé, (dés)activation)
-- [x] Onglet « Récurrents » inséré après « Saisie » : liste des paiements récurrents + formulaire d'ajout
-- [x] Modifier un paiement récurrent (effet sur les occurrences futures uniquement, jamais rétroactif)
-- [x] Désactiver / réactiver un paiement récurrent depuis l'onglet
-- [x] Rafraîchir les autres onglets après création, modification ou (dés)activation
-- [x] Tests de l'onglet (Qt Test, offscreen)
+### v0.2.0 — Interface d'import / export
 
-### Phase 9 — Packaging & distribution
-- [x] Fichier `.desktop` + icône pour l'intégration au bureau
-- [x] Règles d'installation CMake (`install(TARGETS ...)`)
-- [x] Configurer CPack avec le générateur `DEB`
-- [x] Déclarer les dépendances runtime du `.deb` (libQt6...)
-- [x] Générer et tester l'installation du `.deb` sur le système
-- [x] (Optionnel) Workflow GitHub Actions : build + `.deb` sur les tags
+- [ ] Menu ou onglet Données : exporter vers un fichier, importer depuis un fichier
+- [ ] Retour visuel du résultat de la fusion (ajouts, mises à jour, suppressions, conflits)
+- [ ] Confirmation avant import, avec rappel que la base est sauvegardée au préalable
+- [ ] Tests de l'interface (Qt Test, offscreen)
+
+### v0.3.0 — Synchronisation distante semi-automatique
+
+- [ ] Chemin d'un dossier partagé configurable (géré côté système par Syncthing, Nextcloud, Dropbox ou équivalent)
+- [ ] Export du fichier d'échange à la fermeture et import avec fusion à l'ouverture
+- [ ] Garantie de ne jamais synchroniser la base vivante, uniquement le fichier d'échange
+- [ ] (Optionnel) Chiffrement du fichier d'échange pour un transit par un cloud tiers
 
 ## Construire le projet
 
-> Prérequis (Debian/Ubuntu) :
-> ```sh
-> sudo apt install build-essential cmake \
->     qt6-base-dev qt6-charts-dev libqt6sql6-sqlite
-> ```
-> Le paquet `libqt6sql6-sqlite` fournit le pilote SQLite de Qt, chargé à
-> l'exécution ; sans lui l'application ne peut pas ouvrir sa base.
+> Prérequis (Debian/Ubuntu) : `sudo apt install build-essential cmake qt6-base-dev qt6-charts-dev libqt6sql6-sqlite`. Le paquet `libqt6sql6-sqlite` fournit le pilote SQLite de Qt, chargé à l'exécution ; sans lui l'application ne peut pas ouvrir sa base.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -153,8 +103,7 @@ ctest --test-dir build        # lancer les tests
 
 ## Générer le paquet `.deb`
 
-> Prérequis supplémentaire : `dpkg-dev` (fournit `dpkg-shlibdeps`, utilisé pour
-> déduire automatiquement les dépendances Qt du paquet).
+> Prérequis supplémentaire : `dpkg-dev` (fournit `dpkg-shlibdeps`, utilisé pour déduire automatiquement les dépendances Qt du paquet).
 
 ```sh
 cmake --build build --target package
@@ -162,12 +111,10 @@ cmake --build build --target package
 cd build && cpack -G DEB
 ```
 
-Le fichier `grossbuch_<version>-1_amd64.deb` est produit dans `build/`.
-Installation (apt résout les dépendances runtime) :
+Le fichier `grossbuch_<version>-1_amd64.deb` est produit dans `build/`. Installation (apt résout les dépendances runtime) :
 
 ```sh
 sudo apt install ./grossbuch_<version>-1_amd64.deb
 ```
 
-Une release GitHub sur un tag `vX.Y.Z` construit et publie automatiquement ce
-paquet (voir `.github/workflows/release.yml`).
+Une release GitHub sur un tag `vX.Y.Z` construit et publie automatiquement ce paquet (voir `.github/workflows/release.yml`).

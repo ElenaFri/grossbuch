@@ -30,6 +30,14 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Sql Test Charts)
 
 enable_testing()
 
+# --- En-tête de version généré ----------------------------------------------
+# Expose PROJECT_VERSION au code sous forme de constante (voir src/ui/AboutTab).
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/Version.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/Version.h
+    @ONLY
+)
+
 # --- Bibliothèque de logique métier (sans dépendance à Qt Widgets) ----------
 # Voir docs/adr/0004.
 add_library(grossbuch_core STATIC
@@ -57,10 +65,11 @@ add_library(grossbuch_ui STATIC
     src/ui/SummaryTab.cpp
     src/ui/ChartsTab.cpp
     src/ui/DataTab.cpp
+    src/ui/AboutTab.cpp
     src/ui/UiHelpers.cpp
 )
 
-target_include_directories(grossbuch_ui PUBLIC src)
+target_include_directories(grossbuch_ui PUBLIC src ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(grossbuch_ui PUBLIC Qt6::Widgets Qt6::Charts grossbuch_core)
 
 target_compile_options(grossbuch_ui PRIVATE

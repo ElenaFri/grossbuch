@@ -4,7 +4,10 @@
 #include "core/RecurringRepository.h"
 #include "ui/MainWindow.h"
 
+#include "Version.h"
+
 #include <QApplication>
+#include <QLabel>
 #include <QLocale>
 #include <QPushButton>
 #include <QSettings>
@@ -30,6 +33,7 @@ private slots:
     void lastTabIsRestored();
     void outOfRangeTabFallsBackToFirst();
     void dataTabExposesActions();
+    void aboutTabShowsVersion();
 
 private:
     std::unique_ptr<MainWindow> makeWindow();
@@ -72,7 +76,7 @@ void UiStateTest::lastTabIsRestored()
         auto window = makeWindow();
         auto *tabs = window->findChild<QTabWidget *>();
         QVERIFY(tabs != nullptr);
-        QCOMPARE(tabs->count(), 5);
+        QCOMPARE(tabs->count(), 6);
         tabs->setCurrentIndex(2);
         // La fermeture déclenche la sauvegarde dans closeEvent.
         window->close();
@@ -119,6 +123,21 @@ void UiStateTest::dataTabExposesActions()
     QVERIFY(hasExport);
     QVERIFY(hasImport);
     QVERIFY(hasRestore);
+}
+
+// L'onglet À propos affiche la version de l'application (celle du build).
+void UiStateTest::aboutTabShowsVersion()
+{
+    auto window = makeWindow();
+
+    const QList<QLabel *> labels = window->findChildren<QLabel *>();
+    bool hasVersion = false;
+    for (const QLabel *label : labels) {
+        if (label->objectName() == QStringLiteral("aboutVersion")
+            && label->text().contains(QString::fromLatin1(kAppVersion)))
+            hasVersion = true;
+    }
+    QVERIFY(hasVersion);
 }
 
 int main(int argc, char *argv[])

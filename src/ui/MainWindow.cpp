@@ -4,6 +4,7 @@
 #include "core/Database.h"
 #include "core/DataController.h"
 #include "core/ExpenseRepository.h"
+#include "ui/AboutTab.h"
 #include "ui/ChartsTab.h"
 #include "ui/DataTab.h"
 #include "ui/EntryTab.h"
@@ -35,6 +36,7 @@ MainWindow::MainWindow(Database &database, CategoryRepository &categories,
     m_summaryTab = new SummaryTab(m_categories, m_expenses);
     m_chartsTab = new ChartsTab(m_expenses);
     m_dataTab = new DataTab(*m_dataController);
+    m_aboutTab = new AboutTab;
 
     m_tabs = new QTabWidget(this);
     m_tabs->addTab(m_entryTab, tr("Saisie"));
@@ -42,6 +44,7 @@ MainWindow::MainWindow(Database &database, CategoryRepository &categories,
     m_tabs->addTab(m_summaryTab, tr("Récapitulatif"));
     m_tabs->addTab(m_chartsTab, tr("Graphiques"));
     m_tabs->addTab(m_dataTab, tr("Données"));
+    m_tabs->addTab(m_aboutTab, tr("À propos"));
     setCentralWidget(m_tabs);
 
     connect(m_entryTab, &EntryTab::expensesChanged, this, &MainWindow::onExpensesChanged);

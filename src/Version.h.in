@@ -1,0 +1,11 @@
+#pragma once
+
+// En-tête généré par CMake (configure_file) à partir de la version du projet.
+// Ne pas éditer à la main : la valeur provient de PROJECT_VERSION dans
+// CMakeLists.txt. Voir docs/adr/0005.
+
+namespace grossbuch {
+
+inline constexpr char kAppVersion[] = "@PROJECT_VERSION@";
+
+} // namespace grossbuch

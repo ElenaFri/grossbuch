@@ -17,10 +17,11 @@ class RecurringTab;
 class SummaryTab;
 class ChartsTab;
 class DataTab;
+class AboutTab;
 
-// Fenêtre principale : un QTabWidget à cinq onglets (Saisie, Récurrents,
-// Récapitulatif, Graphiques, Données). Les dépôts du cœur métier sont injectés
-// par référence et consommés par les onglets. Voir docs/adr/0004.
+// Fenêtre principale : un QTabWidget à six onglets (Saisie, Récurrents,
+// Récapitulatif, Graphiques, Données, À propos). Les dépôts du cœur métier sont
+// injectés par référence et consommés par les onglets. Voir docs/adr/0004.
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -64,6 +65,7 @@ private:
     SummaryTab *m_summaryTab = nullptr;
     ChartsTab *m_chartsTab = nullptr;
     DataTab *m_dataTab = nullptr;
+    AboutTab *m_aboutTab = nullptr;
 };
 
 } // namespace grossbuch

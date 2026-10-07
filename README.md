@@ -18,13 +18,14 @@ Les choix techniques, l'architecture et le modèle de données sont documentés 
 
 ## Fonctionnalités existantes
 
-L'application s'organise autour de cinq onglets.
+L'application s'organise autour de six onglets.
 
 - Saisie : enregistrement d'une dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante groupée, modification et suppression d'une dépense, et liste des dépenses du mois en cours.
 - Paiements récurrents : modèles de dépenses qui reviennent chaque mois, matérialisés automatiquement sur le mois en cours, modifiables pour l'avenir seulement et désactivables ou réactivables sans perte de l'historique.
 - Récapitulatif : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général.
 - Graphiques annuels : courbes des dépenses totales mensuelles superposées d'une année sur l'autre, les trois dernières années par défaut, avec sélection des années visibles.
 - Données : export vers un fichier d'échange, import avec fusion (rapport affiché), et restauration d'une sauvegarde choisie dans la liste.
+- À propos : nom et version de l'application, licence, auteur, lien vers le dépôt et version de Qt.
 
 Socle technique : stockage local SQLite, montants stockés en centimes pour éviter les erreurs d'arrondi, interface francophone, persistance de l'état de la fenêtre, distribution en paquet `.deb` et release GitHub automatisée sur les tags.
 

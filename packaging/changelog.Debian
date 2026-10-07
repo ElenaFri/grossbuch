@@ -1,13 +1,29 @@
+grossbuch (0.2.0-1) unstable; urgency=medium
+
+  * Durable and transferable data (offline).
+    - Synchronisable database schema (v3): stable per-category key, uuid and
+      timestamps on expenses and recurring payments, logical deletion
+      (tombstone); automatic migration of existing databases.
+    - Exchange engine: export and import in a portable JSON format, row-by-row
+      merge by uuid with a "latest wins" rule, idempotent import and conflict
+      logging.
+    - Automatic timestamped backups (consistent copy via VACUUM INTO),
+      rotation keeping the N most recent, systematic backup before every
+      import, restore from within the application.
+    - New Data tab: export, import and restore a backup, with visual feedback
+      on the merge result.
+    - Removed the CSV export from the summary (superseded by the JSON export).
+
+ -- Elena FRISON <e_gavrilova_frison@zohomail.eu>  Wed, 07 Oct 2026 12:00:00 +0200
+
 grossbuch (0.1.0-1) unstable; urgency=medium
 
-  * Version initiale.
-    - Saisie des dépenses par catégories et sous-catégories, avec édition et
-      suppression.
-    - Paiements récurrents paramétrables, matérialisés automatiquement sur le
-      mois en cours (jamais rétroactifs ni dans le futur).
-    - Récapitulatif par catégorie pour un mois ou une année, avec total et
-      export CSV.
-    - Graphiques annuels superposés (trois dernières années par défaut).
-    - Base SQLite locale, montants stockés en centimes.
+  * Initial release.
+    - Expense entry by category and sub-category, with editing and deletion.
+    - Configurable recurring payments, materialised automatically for the
+      current month (never retroactive nor in the future).
+    - Summary by category for a month or a year, with total and CSV export.
+    - Overlaid yearly charts (last three years by default).
+    - Local SQLite database, amounts stored in cents.
 
  -- Elena FRISON <e_gavrilova_frison@zohomail.eu>  Tue, 06 Oct 2026 00:00:00 +0200

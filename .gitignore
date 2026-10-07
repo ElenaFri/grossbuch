@@ -60,6 +60,10 @@ compile_commands.json
 # vcpkg
 vcpkg_installed/
 
+# Python (outils de conversion)
+__pycache__/
+*.pyc
+
 # debug information files
 *.dwo
 

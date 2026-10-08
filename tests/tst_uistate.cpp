@@ -9,12 +9,15 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QGuiApplication>
 #include <QLabel>
 #include <QLocale>
 #include <QMenuBar>
 #include <QSettings>
+#include <QSignalSpy>
 #include <QStackedWidget>
 #include <QStandardPaths>
+#include <QTimer>
 #include <QToolBar>
 #include <QtTest>
 
@@ -38,10 +41,13 @@ private slots:
     void hasNoNavigationToolbar();
     void menusExposeActions();
     void aboutDialogShowsVersion();
+    void quittingClosesWithoutLingering();
 
 private:
     std::unique_ptr<MainWindow> makeWindow();
     static QStringList actionTexts(const MainWindow *window);
+    static QAction *viewAction(const MainWindow *window, int index);
+    static QAction *actionContaining(const MainWindow *window, const QString &needle);
 
     std::unique_ptr<Database> m_db;
     std::unique_ptr<CategoryRepository> m_categories;
@@ -84,6 +90,31 @@ QStringList UiStateTest::actionTexts(const MainWindow *window)
     return texts;
 }
 
+// Première action dont la donnée associée vaut l'indice de vue demandé (les
+// actions de navigation portent leur indice de pile dans QAction::data()).
+QAction *UiStateTest::viewAction(const MainWindow *window, int index)
+{
+    const QList<QAction *> actions = window->findChildren<QAction *>();
+    QAction *found = nullptr;
+    for (QAction *action : actions) {
+        if (found == nullptr && action->data().isValid() && action->data().toInt() == index)
+            found = action;
+    }
+    return found;
+}
+
+// Première action dont le libellé contient le texte donné.
+QAction *UiStateTest::actionContaining(const MainWindow *window, const QString &needle)
+{
+    const QList<QAction *> actions = window->findChildren<QAction *>();
+    QAction *found = nullptr;
+    for (QAction *action : actions) {
+        if (found == nullptr && action->text().contains(needle))
+            found = action;
+    }
+    return found;
+}
+
 void UiStateTest::opensOnChartsView()
 {
     // Index de la vue Graphiques dans la pile (ViewCharts).
@@ -99,14 +130,10 @@ void UiStateTest::opensOnChartsView()
 
         // On bascule ailleurs puis on ferme : la vue n'est volontairement pas
         // mémorisée d'une session à l'autre.
-        QAction *target = nullptr;
-        const QList<QAction *> actions = window->findChildren<QAction *>();
-        for (QAction *action : actions) {
-            if (action->data().isValid() && action->data().toInt() == 2 && target == nullptr)
-                target = action;
-        }
+        QAction *target = viewAction(window.get(), 2);
         QVERIFY(target != nullptr);
-        target->trigger();
+        if (target != nullptr)
+            target->trigger();
         QCOMPARE(stack->currentIndex(), 2);
         window->close();
     }
@@ -173,6 +200,37 @@ void UiStateTest::aboutDialogShowsVersion()
             hasVersion = true;
     }
     QVERIFY(hasVersion);
+}
+
+// Régression : déclencher Quitter ferme la dernière fenêtre et laisse la boucle
+// d'événements se terminer d'elle-même (l'application ne doit pas persister en
+// arrière-plan). On s'appuie sur quitOnLastWindowClosed (défaut) : la fermeture
+// de la dernière fenêtre émet lastWindowClosed, ce qui doit suffire à sortir de
+// exec(). Un minuteur de sécurité évite tout blocage si la sortie n'arrivait pas.
+void UiStateTest::quittingClosesWithoutLingering()
+{
+    QVERIFY(QApplication::quitOnLastWindowClosed());
+
+    auto window = makeWindow();
+    window->show();
+
+    QAction *quit = actionContaining(window.get(), QStringLiteral("Quitter"));
+    QVERIFY(quit != nullptr);
+
+    QSignalSpy lastClosed(qApp, &QGuiApplication::lastWindowClosed);
+
+    bool safetyFired = false;
+    QTimer::singleShot(0, quit, [quit]() { quit->trigger(); });
+    QTimer::singleShot(5000, qApp, [&safetyFired]() {
+        safetyFired = true;
+        QCoreApplication::quit();
+    });
+    QCoreApplication::exec();
+
+    // La boucle est sortie d'elle-même (filet de sécurité non déclenché) et la
+    // dernière fenêtre s'est bien fermée une fois.
+    QVERIFY(!safetyFired);
+    QCOMPARE(lastClosed.count(), 1);
 }
 
 int main(int argc, char *argv[])

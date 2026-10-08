@@ -127,6 +127,97 @@ bool backfillSyncColumns(QSqlDatabase &db, const QString &table, const QString &
     return true;
 }
 
+// Migration vers la version 1 : schéma initial.
+bool migrateToV1(QSqlQuery &query)
+{
+    const QStringList statements = {
+        QStringLiteral("CREATE TABLE categories ("
+                       "  id INTEGER PRIMARY KEY,"
+                       "  name TEXT NOT NULL,"
+                       "  parent_id INTEGER REFERENCES categories(id))"),
+        QStringLiteral("CREATE TABLE expenses ("
+                       "  id INTEGER PRIMARY KEY,"
+                       "  amount INTEGER NOT NULL,"
+                       "  date TEXT NOT NULL,"
+                       "  label TEXT,"
+                       "  category_id INTEGER NOT NULL REFERENCES categories(id))"),
+        QStringLiteral("CREATE INDEX idx_expenses_date ON expenses(date)"),
+        QStringLiteral("CREATE INDEX idx_expenses_category ON expenses(category_id)"),
+    };
+    for (const QString &statement : statements) {
+        if (!query.exec(statement))
+            return false;
+    }
+    return true;
+}
+
+// Migration vers la version 2 : paiements récurrents (voir docs/adr/0010).
+bool migrateToV2(QSqlQuery &query)
+{
+    const QStringList statements = {
+        QStringLiteral("CREATE TABLE recurring_expenses ("
+                       "  id INTEGER PRIMARY KEY,"
+                       "  amount INTEGER NOT NULL,"
+                       "  label TEXT,"
+                       "  category_id INTEGER NOT NULL REFERENCES categories(id),"
+                       "  day_of_month INTEGER NOT NULL,"
+                       "  start_year INTEGER NOT NULL,"
+                       "  start_month INTEGER NOT NULL,"
+                       "  active INTEGER NOT NULL DEFAULT 1,"
+                       "  last_year INTEGER NOT NULL DEFAULT 0,"
+                       "  last_month INTEGER NOT NULL DEFAULT 0)"),
+        QStringLiteral("ALTER TABLE expenses ADD COLUMN recurring_id INTEGER "
+                       "REFERENCES recurring_expenses(id)"),
+        QStringLiteral("CREATE INDEX idx_expenses_recurring ON expenses(recurring_id)"),
+    };
+    for (const QString &statement : statements) {
+        if (!query.exec(statement))
+            return false;
+    }
+    return true;
+}
+
+// Migration vers la version 3 : schéma synchronisable (voir docs/adr/0011).
+// Clé stable de catégorie, identité synchronisable (uuid + horodatages +
+// marqueur de suppression) sur les dépenses et les paiements récurrents.
+bool migrateToV3(QSqlDatabase &db, QSqlQuery &query)
+{
+    const QStringList alters = {
+        QStringLiteral("ALTER TABLE categories ADD COLUMN key TEXT"),
+        QStringLiteral("ALTER TABLE expenses ADD COLUMN uuid TEXT"),
+        QStringLiteral("ALTER TABLE expenses ADD COLUMN created_at TEXT"),
+        QStringLiteral("ALTER TABLE expenses ADD COLUMN updated_at TEXT"),
+        QStringLiteral("ALTER TABLE expenses ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"),
+        QStringLiteral("ALTER TABLE recurring_expenses ADD COLUMN uuid TEXT"),
+        QStringLiteral("ALTER TABLE recurring_expenses ADD COLUMN created_at TEXT"),
+        QStringLiteral("ALTER TABLE recurring_expenses ADD COLUMN updated_at TEXT"),
+        QStringLiteral(
+            "ALTER TABLE recurring_expenses ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"),
+    };
+    for (const QString &statement : alters) {
+        if (!query.exec(statement))
+            return false;
+    }
+
+    const QString now = nowTimestampUtc();
+    if (!populateCategoryKeys(db) || !backfillSyncColumns(db, QStringLiteral("expenses"), now)
+        || !backfillSyncColumns(db, QStringLiteral("recurring_expenses"), now))
+        return false;
+
+    // L'unicité est posée par index, SQLite n'autorisant pas une colonne
+    // UNIQUE ajoutée par ALTER. Elle est créée après remplissage.
+    const QStringList indexes = {
+        QStringLiteral("CREATE UNIQUE INDEX idx_expenses_uuid ON expenses(uuid)"),
+        QStringLiteral("CREATE UNIQUE INDEX idx_recurring_uuid ON recurring_expenses(uuid)"),
+        QStringLiteral("CREATE UNIQUE INDEX idx_categories_key ON categories(key)"),
+    };
+    for (const QString &statement : indexes) {
+        if (!query.exec(statement))
+            return false;
+    }
+    return true;
+}
+
 } // namespace
 
 QString Database::defaultDatabasePath()
@@ -233,99 +324,19 @@ bool Database::applyMigrations()
     if (!db.transaction())
         return false;
 
-    // Migration vers la version 1 : schéma initial.
-    if (version < 1) {
-        const QStringList statements = {
-            QStringLiteral("CREATE TABLE categories ("
-                           "  id INTEGER PRIMARY KEY,"
-                           "  name TEXT NOT NULL,"
-                           "  parent_id INTEGER REFERENCES categories(id))"),
-            QStringLiteral("CREATE TABLE expenses ("
-                           "  id INTEGER PRIMARY KEY,"
-                           "  amount INTEGER NOT NULL,"
-                           "  date TEXT NOT NULL,"
-                           "  label TEXT,"
-                           "  category_id INTEGER NOT NULL REFERENCES categories(id))"),
-            QStringLiteral("CREATE INDEX idx_expenses_date ON expenses(date)"),
-            QStringLiteral("CREATE INDEX idx_expenses_category ON expenses(category_id)"),
-        };
-        for (const QString &statement : statements) {
-            if (!query.exec(statement)) {
-                db.rollback();
-                return false;
-            }
-        }
+    if (version < 1 && !migrateToV1(query)) {
+        db.rollback();
+        return false;
     }
 
-    // Migration vers la version 2 : paiements récurrents (voir docs/adr/0010).
-    if (version < 2) {
-        const QStringList statements = {
-            QStringLiteral("CREATE TABLE recurring_expenses ("
-                           "  id INTEGER PRIMARY KEY,"
-                           "  amount INTEGER NOT NULL,"
-                           "  label TEXT,"
-                           "  category_id INTEGER NOT NULL REFERENCES categories(id),"
-                           "  day_of_month INTEGER NOT NULL,"
-                           "  start_year INTEGER NOT NULL,"
-                           "  start_month INTEGER NOT NULL,"
-                           "  active INTEGER NOT NULL DEFAULT 1,"
-                           "  last_year INTEGER NOT NULL DEFAULT 0,"
-                           "  last_month INTEGER NOT NULL DEFAULT 0)"),
-            QStringLiteral("ALTER TABLE expenses ADD COLUMN recurring_id INTEGER "
-                           "REFERENCES recurring_expenses(id)"),
-            QStringLiteral("CREATE INDEX idx_expenses_recurring ON expenses(recurring_id)"),
-        };
-        for (const QString &statement : statements) {
-            if (!query.exec(statement)) {
-                db.rollback();
-                return false;
-            }
-        }
+    if (version < 2 && !migrateToV2(query)) {
+        db.rollback();
+        return false;
     }
 
-    // Migration vers la version 3 : schéma synchronisable (voir docs/adr/0011).
-    // Clé stable de catégorie, identité synchronisable (uuid + horodatages +
-    // marqueur de suppression) sur les dépenses et les paiements récurrents.
-    if (version < 3) {
-        const QStringList alters = {
-            QStringLiteral("ALTER TABLE categories ADD COLUMN key TEXT"),
-            QStringLiteral("ALTER TABLE expenses ADD COLUMN uuid TEXT"),
-            QStringLiteral("ALTER TABLE expenses ADD COLUMN created_at TEXT"),
-            QStringLiteral("ALTER TABLE expenses ADD COLUMN updated_at TEXT"),
-            QStringLiteral("ALTER TABLE expenses ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"),
-            QStringLiteral("ALTER TABLE recurring_expenses ADD COLUMN uuid TEXT"),
-            QStringLiteral("ALTER TABLE recurring_expenses ADD COLUMN created_at TEXT"),
-            QStringLiteral("ALTER TABLE recurring_expenses ADD COLUMN updated_at TEXT"),
-            QStringLiteral(
-                "ALTER TABLE recurring_expenses ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0"),
-        };
-        for (const QString &statement : alters) {
-            if (!query.exec(statement)) {
-                db.rollback();
-                return false;
-            }
-        }
-
-        const QString now = nowTimestampUtc();
-        if (!populateCategoryKeys(db) || !backfillSyncColumns(db, QStringLiteral("expenses"), now)
-            || !backfillSyncColumns(db, QStringLiteral("recurring_expenses"), now)) {
-            db.rollback();
-            return false;
-        }
-
-        // L'unicité est posée par index, SQLite n'autorisant pas une colonne
-        // UNIQUE ajoutée par ALTER. Elle est créée après remplissage.
-        const QStringList indexes = {
-            QStringLiteral("CREATE UNIQUE INDEX idx_expenses_uuid ON expenses(uuid)"),
-            QStringLiteral("CREATE UNIQUE INDEX idx_recurring_uuid ON recurring_expenses(uuid)"),
-            QStringLiteral("CREATE UNIQUE INDEX idx_categories_key ON categories(key)"),
-        };
-        for (const QString &statement : indexes) {
-            if (!query.exec(statement)) {
-                db.rollback();
-                return false;
-            }
-        }
+    if (version < 3 && !migrateToV3(db, query)) {
+        db.rollback();
+        return false;
     }
 
     // PRAGMA user_version n'accepte pas de valeur liée : on interpole l'entier.

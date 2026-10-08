@@ -55,6 +55,25 @@ QVariant labelBind(const QJsonValue &labelValue)
     return QVariant(label);
 }
 
+// Vrai si le libellé entrant diffère du libellé local, « vide » et « null » étant
+// traités comme équivalents.
+bool labelChanged(bool localLabelNull, const QString &localLabel, const QJsonValue &labelValue)
+{
+    const bool incomingLabelNull = labelValue.isNull() || labelValue.toString().isEmpty();
+    if (localLabelNull != incomingLabelNull)
+        return true;
+    return !incomingLabelNull && localLabel != labelValue.toString();
+}
+
+// Vrai si le rattachement à un paiement récurrent diffère (null compris).
+bool recurringLinkChanged(const QVariant &local, const QVariant &incoming)
+{
+    const bool incomingNull = incoming.isNull();
+    if (local.isNull() != incomingNull)
+        return true;
+    return !incomingNull && local.toInt() != incoming.toInt();
+}
+
 bool mergeRecurring(QSqlDatabase &db, const QJsonObject &object,
                     const QHash<QString, int> &categoryByKey, MergeReport &report)
 {
@@ -128,7 +147,6 @@ bool mergeRecurring(QSqlDatabase &db, const QJsonObject &object,
         return true;
     }
 
-    const bool incomingLabelNull = labelValue.isNull() || labelValue.toString().isEmpty();
     QStringList changes;
     if (localAmount != amount)
         changes << QStringLiteral("montant %1→%2").arg(localAmount).arg(amount);
@@ -140,7 +158,7 @@ bool mergeRecurring(QSqlDatabase &db, const QJsonObject &object,
         changes << QStringLiteral("mois de début");
     if (localActive != active)
         changes << QStringLiteral("état actif");
-    if (localLabelNull != incomingLabelNull || (!incomingLabelNull && localLabel != labelValue.toString()))
+    if (labelChanged(localLabelNull, localLabel, labelValue))
         changes << QStringLiteral("libellé");
 
     // Le repère de matérialisation est porté au plus avancé des deux (jamais en
@@ -244,7 +262,6 @@ bool mergeExpense(QSqlDatabase &db, const QJsonObject &object,
         return true;
     }
 
-    const bool incomingLabelNull = labelValue.isNull() || labelValue.toString().isEmpty();
     QStringList changes;
     if (localAmount != amount)
         changes << QStringLiteral("montant %1→%2").arg(localAmount).arg(amount);
@@ -252,11 +269,9 @@ bool mergeExpense(QSqlDatabase &db, const QJsonObject &object,
         changes << QStringLiteral("date");
     if (localCategory != categoryId)
         changes << QStringLiteral("catégorie");
-    if (localLabelNull != incomingLabelNull || (!incomingLabelNull && localLabel != labelValue.toString()))
+    if (labelChanged(localLabelNull, localLabel, labelValue))
         changes << QStringLiteral("libellé");
-    const bool incomingRecurringNull = recurringId.isNull();
-    if (localRecurring.isNull() != incomingRecurringNull
-        || (!incomingRecurringNull && localRecurring.toInt() != recurringId.toInt()))
+    if (recurringLinkChanged(localRecurring, recurringId))
         changes << QStringLiteral("rattachement récurrent");
 
     QSqlQuery update(db);
@@ -283,6 +298,64 @@ bool mergeExpense(QSqlDatabase &db, const QJsonObject &object,
         report.conflicts.append(MergeConflict{QStringLiteral("expenses"), uuid, localUpdatedAt,
                                               updatedAt, changes.join(QStringLiteral(", "))});
     }
+    return true;
+}
+
+// Fusionne tous les modèles récurrents du tableau ; s'arrête au premier échec.
+bool mergeRecurringArray(QSqlDatabase &db, const QJsonArray &array,
+                         const QHash<QString, int> &categoryByKey, MergeReport &report)
+{
+    for (const QJsonValue &value : array) {
+        if (!mergeRecurring(db, value.toObject(), categoryByKey, report))
+            return false;
+    }
+    return true;
+}
+
+// Fusionne toutes les dépenses du tableau ; s'arrête au premier échec.
+bool mergeExpenseArray(QSqlDatabase &db, const QJsonArray &array,
+                       const QHash<QString, int> &categoryByKey,
+                       const QHash<QString, int> &recurringByUuid, MergeReport &report)
+{
+    for (const QJsonValue &value : array) {
+        if (!mergeExpense(db, value.toObject(), categoryByKey, recurringByUuid, report))
+            return false;
+    }
+    return true;
+}
+
+// Valide l'en-tête du document d'échange (format et version). Renseigne *error.
+bool validateExchangeRoot(const QJsonObject &root, QString *error)
+{
+    if (root.value(QStringLiteral("format")).toString() != QString::fromLatin1(ExchangeService::formatName())) {
+        if (error)
+            *error = QStringLiteral("Format de fichier non reconnu.");
+        return false;
+    }
+    const int version = root.value(QStringLiteral("formatVersion")).toInt(-1);
+    if (version < 1 || version > ExchangeService::formatVersion) {
+        if (error)
+            *error = QStringLiteral("Version de format non prise en charge : %1").arg(version);
+        return false;
+    }
+    return true;
+}
+
+// Sauvegarde systématique avant modification en place (voir docs/adr/0013).
+// Un répertoire vide désactive la sauvegarde. Renseigne *error en cas d'échec.
+bool performPreImportBackup(Database &database, const QString &directory, QString *error)
+{
+    if (directory.isEmpty())
+        return true;
+    BackupService backup(database, directory);
+    QString backupError;
+    if (!backup.createBackup(&backupError).has_value()) {
+        if (error)
+            *error = QStringLiteral("Sauvegarde préalable impossible, import annulé : %1")
+                         .arg(backupError);
+        return false;
+    }
+    backup.rotate();
     return true;
 }
 
@@ -395,31 +468,11 @@ bool ExchangeService::importDocument(const QJsonDocument &document, MergeReport 
         return false;
     }
     const QJsonObject root = document.object();
-    if (root.value(QStringLiteral("format")).toString() != QString::fromLatin1(formatName())) {
-        if (error)
-            *error = QStringLiteral("Format de fichier non reconnu.");
+    if (!validateExchangeRoot(root, error))
         return false;
-    }
-    const int version = root.value(QStringLiteral("formatVersion")).toInt(-1);
-    if (version < 1 || version > formatVersion) {
-        if (error)
-            *error = QStringLiteral("Version de format non prise en charge : %1").arg(version);
-        return false;
-    }
 
-    // Sauvegarde systématique avant de modifier la base en place (voir
-    // docs/adr/0013). En cas d'échec, on n'importe pas.
-    if (!m_backupDirectory.isEmpty()) {
-        BackupService backup(m_database, m_backupDirectory);
-        QString backupError;
-        if (!backup.createBackup(&backupError).has_value()) {
-            if (error)
-                *error = QStringLiteral("Sauvegarde préalable impossible, import annulé : %1")
-                             .arg(backupError);
-            return false;
-        }
-        backup.rotate();
-    }
+    if (!performPreImportBackup(m_database, m_backupDirectory, error))
+        return false;
 
     QHash<QString, int> categoryByKey;
     {
@@ -436,14 +489,11 @@ bool ExchangeService::importDocument(const QJsonDocument &document, MergeReport 
     }
 
     // Les modèles d'abord : le rattachement d'une dépense se résout ensuite.
-    const QJsonArray recurring = root.value(QStringLiteral("recurring")).toArray();
-    for (const QJsonValue &value : recurring) {
-        if (!mergeRecurring(db, value.toObject(), categoryByKey, report)) {
-            db.rollback();
-            if (error)
-                *error = QStringLiteral("Échec de la fusion des paiements récurrents.");
-            return false;
-        }
+    if (!mergeRecurringArray(db, root.value(QStringLiteral("recurring")).toArray(), categoryByKey, report)) {
+        db.rollback();
+        if (error)
+            *error = QStringLiteral("Échec de la fusion des paiements récurrents.");
+        return false;
     }
 
     QHash<QString, int> recurringByUuid;
@@ -455,14 +505,12 @@ bool ExchangeService::importDocument(const QJsonDocument &document, MergeReport 
         }
     }
 
-    const QJsonArray expenses = root.value(QStringLiteral("expenses")).toArray();
-    for (const QJsonValue &value : expenses) {
-        if (!mergeExpense(db, value.toObject(), categoryByKey, recurringByUuid, report)) {
-            db.rollback();
-            if (error)
-                *error = QStringLiteral("Échec de la fusion des dépenses.");
-            return false;
-        }
+    if (!mergeExpenseArray(db, root.value(QStringLiteral("expenses")).toArray(), categoryByKey,
+                           recurringByUuid, report)) {
+        db.rollback();
+        if (error)
+            *error = QStringLiteral("Échec de la fusion des dépenses.");
+        return false;
     }
 
     if (!db.commit()) {

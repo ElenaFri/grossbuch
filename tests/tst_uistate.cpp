@@ -124,6 +124,8 @@ void UiStateTest::opensOnChartsView()
         auto window = makeWindow();
         auto *stack = window->findChild<QStackedWidget *>();
         QVERIFY(stack != nullptr);
+        if (stack == nullptr)
+            return;
         QCOMPARE(stack->count(), 4);
         // Au lancement, la vue affichée est toujours les graphiques.
         QCOMPARE(stack->currentIndex(), chartsIndex);
@@ -132,8 +134,9 @@ void UiStateTest::opensOnChartsView()
         // mémorisée d'une session à l'autre.
         QAction *target = viewAction(window.get(), 2);
         QVERIFY(target != nullptr);
-        if (target != nullptr)
-            target->trigger();
+        if (target == nullptr)
+            return;
+        target->trigger();
         QCOMPARE(stack->currentIndex(), 2);
         window->close();
     }
@@ -142,6 +145,8 @@ void UiStateTest::opensOnChartsView()
     auto window = makeWindow();
     auto *stack = window->findChild<QStackedWidget *>();
     QVERIFY(stack != nullptr);
+    if (stack == nullptr)
+        return;
     QCOMPARE(stack->currentIndex(), chartsIndex);
 }
 
@@ -216,6 +221,8 @@ void UiStateTest::quittingClosesWithoutLingering()
 
     QAction *quit = actionContaining(window.get(), QStringLiteral("Quitter"));
     QVERIFY(quit != nullptr);
+    if (quit == nullptr)
+        return;
 
     QSignalSpy lastClosed(qApp, &QGuiApplication::lastWindowClosed);
 

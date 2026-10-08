@@ -25,3 +25,4 @@ Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
 - [0015 - Dépendances .deb portables et indépendantes de la machine de build](0015-paquet-deb-portable.md)
 - [0016 - Navigation par barre de menus et vues empilées](0016-navigation-par-menus.md)
 - [0017 - Affichage par défaut de la seule année en cours dans les graphiques](0017-graphiques-annee-en-cours-par-defaut.md)
+- [0018 - Neutralisation documentée de faux positifs SonarCloud](0018-neutralisation-faux-positifs-sonar.md)

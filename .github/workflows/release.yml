@@ -1,7 +1,8 @@
 name: Release
 
-# Construit le paquet .deb et le publie comme asset de release lorsqu'un tag
-# de version (vX.Y.Z) est pouss\u00e9. Voir Phase 9 du plan et docs/adr/0005.
+# Construit le paquet .deb et l'AppImage, puis les publie comme assets de release
+# lorsqu'un tag de version (vX.Y.Z) est poussé. Voir docs/adr/0005 (.deb) et
+# docs/adr/0021 (AppImage).
 on:
   push:
     tags:
@@ -45,3 +46,33 @@ jobs:
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: build/*.deb
+
+  build-appimage:
+    # AppImage construite sur Ubuntu 22.04 pour viser une glibc plus ancienne et
+    # une portabilité large. Voir docs/adr/0021.
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Installer les dépendances
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            cmake \
+            build-essential \
+            qt6-base-dev \
+            libqt6charts6-dev \
+            libqt6sql6-sqlite \
+            libgl1-mesa-dev \
+            curl \
+            file
+
+      - name: Construire l'AppImage
+        run: bash packaging/build-appimage.sh
+
+      - name: Publier l'AppImage dans la release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          files: build/grossbuch-x86_64.AppImage

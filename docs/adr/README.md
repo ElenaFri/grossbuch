@@ -28,3 +28,4 @@ Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
 - [0018 - Neutralisation documentée de faux positifs SonarCloud](0018-neutralisation-faux-positifs-sonar.md)
 - [0019 - Exclusions de couverture pour le code intestable par nature](0019-exclusions-de-couverture.md)
 - [0020 - Synchronisation distante semi-automatique par dossier partagé](0020-synchronisation-distante.md)
+- [0021 - Distribution complémentaire au format AppImage](0021-distribution-appimage.md)

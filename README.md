@@ -1,38 +1,99 @@
 # grossbuch
 
-Application de comptabilité privée pour Linux, écrite en C++ / Qt.
+grossbuch est une application de comptabilité familiale pour Linux : on y saisit rapidement ses dépenses classées par catégories, on consulte un récapitulatif au mois ou à l'année, et on suit l'évolution des dépenses totales d'une année sur l'autre. Les données restent sur votre ordinateur, dans une base locale, et peuvent être partagées entre plusieurs machines d'un même foyer sans serveur ni compte en ligne.
 
-L'objectif est de saisir rapidement ses dépenses, en les classant par catégories, de consulter un récapitulatif par catégorie au mois ou à l'année et de visualiser l'évolution des dépenses totales d'une année sur l'autre.
-
-On est dans une approche minimaliste et optimisée.
+Ce document est avant tout un guide d'utilisation. La feuille de route et les informations destinées aux développeurs se trouvent en fin de page. Les choix techniques et le modèle de données sont documentés sous forme d'ADR dans [docs/adr/](docs/adr/).
 
 ## Sommaire
 
-- [Fonctionnalités existantes](#fonctionnalités-existantes)
-- [Catégories](#catégories)
+- [Fonctionnalités](#fonctionnalités)
+- [Installation](#installation)
+- [Guide d'utilisation](#guide-dutilisation)
+- [Partager les données entre plusieurs ordinateurs](#partager-les-données-entre-plusieurs-ordinateurs)
+- [Sauvegardes, import et export](#sauvegardes-import-et-export)
+- [Les catégories](#les-catégories)
+- [Où sont stockées mes données](#où-sont-stockées-mes-données)
 - [Feuille de route](#feuille-de-route)
-- [Construire le projet](#construire-le-projet)
-- [Générer le paquet `.deb`](#générer-le-paquet-deb)
+- [Pour les développeurs](#pour-les-développeurs)
 
-Les choix techniques, l'architecture et le modèle de données sont documentés sous forme d'ADR (Architecture Decision Records) dans [docs/adr/](docs/adr/).
+## Fonctionnalités
 
-## Fonctionnalités existantes
+- Saisie rapide des dépenses par catégorie et sous-catégorie, avec libellé facultatif, modification et suppression d'une dépense isolée.
+- Dépenses récurrentes reportées automatiquement sur le mois en cours, modifiables pour l'avenir seulement et désactivables sans perte de l'historique.
+- Récapitulatif agrégé par catégorie et sous-catégorie, pour un mois précis ou une année entière, avec total général.
+- Graphiques des dépenses totales mensuelles, superposables d'une année sur l'autre, limités aux mois réellement renseignés.
+- Partage des données entre plusieurs ordinateurs par simple dossier partagé, avec fusion automatique et sans serveur.
+- Sauvegardes automatiques horodatées avec rotation, sauvegarde systématique avant import et restauration depuis l'application.
+- Import et export par fichier d'échange portable, avec rapport de fusion détaillé.
+- Stockage local SQLite, montants gérés en centimes pour éviter les erreurs d'arrondi, interface francophone.
 
-L'application se pilote par une barre de menus (Fichier, Édition, Affichage, Aide) et n'affiche qu'une vue à la fois ; les raccourcis Ctrl+1 à Ctrl+4 permettent de passer de l'une à l'autre. Au lancement, la vue Graphiques est affichée.
+## Installation
 
-- Saisie des dépenses (menu Édition) : enregistrement d'une dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante groupée, modification et suppression d'une dépense, et liste des dépenses du mois en cours.
-- Dépenses récurrentes (menu Édition) : modèles de dépenses qui reviennent chaque mois, matérialisés automatiquement sur le mois en cours, modifiables pour l'avenir seulement et désactivables ou réactivables sans perte de l'historique.
-- Récapitulatif (menu Affichage) : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général.
-- Graphiques annuels (menu Affichage) : courbes des dépenses totales mensuelles superposables d'une année sur l'autre ; au lancement, seule l'année en cours est tracée, les autres restant sélectionnables.
-- Échange et sauvegardes (menu Fichier) : export vers un fichier d'échange, import avec fusion (rapport affiché), et restauration d'une sauvegarde choisie dans une liste.
-- Synchronisation distante (menu Fichier) : un dossier partagé (géré par Syncthing, Nextcloud, Dropbox ou équivalent) dans lequel chaque machine dépose son propre instantané ; import et fusion automatiques des instantanés des autres appareils à l'ouverture, export à la fermeture, et action « Synchroniser maintenant » manuelle. La base vivante n'est jamais synchronisée directement.
-- Aide (menu Aide) : guide d'utilisation concis et boîte À propos (nom, version, licence, auteur, lien vers le dépôt et version de Qt).
+Téléchargez le paquet `grossbuch_<version>-1_amd64.deb` depuis la page des releases du dépôt, puis installez-le avec apt, qui résout automatiquement les dépendances Qt :
 
-Socle technique : stockage local SQLite, montants stockés en centimes pour éviter les erreurs d'arrondi, interface francophone, persistance de l'état de la fenêtre, distribution en paquet `.deb` et release GitHub automatisée sur les tags.
+```sh
+sudo apt install ./grossbuch_<version>-1_amd64.deb
+```
 
-## Catégories
+L'application apparaît ensuite dans le menu de votre environnement de bureau, ou se lance depuis un terminal avec la commande `grossbuch`. Au premier démarrage, la base de données et la liste des catégories sont créées automatiquement : il n'y a rien à configurer pour commencer à saisir.
 
-Hiérarchie initiale (pré-remplie au premier lancement) :
+Une AppImage est également publiée pour chaque version, comme format de secours sur les distributions non-Debian. Il s'agit d'un fichier unique, sans installation : téléchargez `grossbuch-x86_64.AppImage`, rendez-le exécutable puis lancez-le.
+
+```sh
+chmod +x grossbuch-x86_64.AppImage
+./grossbuch-x86_64.AppImage
+```
+
+Sur les systèmes dérivés de Debian, préférez le paquet `.deb`, mieux intégré au bureau et mis à jour par apt.
+
+## Guide d'utilisation
+
+L'application se pilote entièrement par une barre de menus (Fichier, Édition, Affichage, Aide) et n'affiche qu'une seule vue à la fois, pour rester lisible. Les raccourcis Ctrl+1 à Ctrl+4 basculent directement d'une vue à l'autre. Au lancement, l'application ouvre les graphiques de l'année en cours.
+
+### Saisir une dépense
+
+Ouvrez la vue de saisie par le menu Édition puis Saisie des dépenses (Ctrl+1). Indiquez le montant et la date, choisissez la sous-catégorie (ou la catégorie si elle n'a pas de sous-catégories) dans la liste déroulante groupée, et ajoutez si vous le souhaitez un libellé facultatif. La dépense s'ajoute aussitôt à la liste des dépenses du mois en cours affichée en dessous. Pour corriger une erreur, sélectionnez une dépense dans cette liste afin de la modifier ou de la supprimer.
+
+### Dépenses récurrentes
+
+La vue Dépenses récurrentes (menu Édition, Ctrl+2) gère les paiements qui reviennent chaque mois, comme un abonnement ou un loyer. Vous définissez un modèle une seule fois et il est automatiquement reporté sur le mois en cours. Lorsque vous modifiez un modèle, seul l'avenir est concerné : les occurrences déjà enregistrées ne sont jamais réécrites, ce qui préserve l'exactitude de l'historique. Un modèle peut être désactivé puis réactivé à tout moment, sans perdre les occurrences passées.
+
+### Consulter le récapitulatif
+
+La vue Récapitulatif (menu Affichage, Ctrl+3) présente un tableau des dépenses agrégées par catégorie, avec le détail par sous-catégorie et un total général. Vous choisissez d'afficher un mois précis ou une année entière, ce qui permet aussi bien le suivi mensuel que le bilan annuel.
+
+### Visualiser les graphiques
+
+La vue Graphiques (menu Affichage, Ctrl+4) trace, pour chaque année enregistrée, la courbe des dépenses totales mois par mois. Les courbes se superposent pour comparer les années entre elles ; au lancement seule l'année en cours est affichée, et vous pouvez activer les autres années à votre convenance. Seuls les mois réellement renseignés apparaissent sur la courbe.
+
+## Partager les données entre plusieurs ordinateurs
+
+grossbuch permet à plusieurs personnes d'un même foyer de travailler sur les mêmes données, chacune sur son ordinateur, sans serveur. Le principe est simple : vous désignez un dossier partagé, synchronisé par un outil que vous utilisez déjà (Syncthing, Nextcloud, Dropbox ou équivalent), et chaque machine y dépose son propre instantané. La base de données vivante n'est jamais partagée directement ; seuls les instantanés le sont, puis sont fusionnés dans chaque base locale.
+
+Pour mettre cela en place, ouvrez le menu Fichier puis Configurer la synchronisation, indiquez le dossier partagé et, si vous le souhaitez, activez la synchronisation automatique. Une fois l'option automatique active, l'application importe et fusionne les instantanés des autres appareils à chaque ouverture, et dépose le sien à chaque fermeture. À tout moment, l'entrée de menu Synchroniser maintenant force un échange immédiat.
+
+```mermaid
+sequenceDiagram
+    participant A as Votre ordinateur
+    participant D as Dossier partagé
+    participant B as Ordinateur du conjoint
+    A->>D: À la fermeture, dépôt de votre instantané
+    D->>B: L'outil de synchronisation recopie les fichiers
+    B->>D: À sa fermeture, dépôt de son instantané
+    D->>A: À l'ouverture, import et fusion des autres instantanés
+```
+
+La fusion se fait ligne par ligne, par identifiant unique, selon la règle « la modification la plus récente l'emporte », et les suppressions se propagent proprement d'une machine à l'autre. Vous pouvez donc saisir chacun de votre côté, même hors ligne, sans risque d'écraser le travail de l'autre.
+
+## Sauvegardes, import et export
+
+L'application réalise seule des sauvegardes horodatées de la base et n'en conserve qu'un nombre limité, les plus récentes, pour ne pas encombrer le disque. Une sauvegarde complète est également créée systématiquement avant tout import. Pour revenir en arrière, utilisez le menu Fichier puis Restaurer une sauvegarde et choisissez la copie voulue dans la liste.
+
+Le menu Fichier propose aussi un export vers un fichier d'échange et un import depuis un tel fichier. L'export produit un fichier portable qui sert à la fois de transfert et de sauvegarde lisible à long terme. L'import fusionne le fichier choisi avec vos données actuelles et affiche un rapport des ajouts, mises à jour, suppressions et conflits ; une confirmation vous est demandée au préalable, en rappelant qu'une sauvegarde automatique est créée avant l'opération.
+
+## Les catégories
+
+La hiérarchie est pré-remplie au premier lancement et reste stable dans le temps :
 
 - Alimentation → Courses · Restaurants
 - Vêtements → Adultes · Enfants
@@ -45,57 +106,32 @@ Hiérarchie initiale (pré-remplie au premier lancement) :
 - Cadeaux et dons
 - Voyages
 
-> Le récapitulatif agrège par catégorie racine (avec détail par sous-catégorie), au mois ou à l'année. Les graphiques annuels n'utilisent que le total général.
+Une dépense s'attache à une sous-catégorie lorsqu'il en existe, sinon directement à la catégorie. Le récapitulatif agrège par catégorie racine avec le détail par sous-catégorie, tandis que les graphiques n'utilisent que le total général.
+
+## Où sont stockées mes données
+
+Vos données vivent dans une base SQLite sous `~/.local/share/grossbuch/grossbuch.db`, et les sauvegardes automatiques sont conservées à côté. Les montants sont stockés en centimes afin d'éviter toute erreur d'arrondi. Les préférences, comme le dossier partagé de synchronisation, sont enregistrées séparément via les réglages standard de l'application.
 
 ## Feuille de route
 
-Prochain objectif : rendre les données pérennes et transmissibles, de sorte que plusieurs personnes d'un même foyer puissent utiliser l'application avec les mêmes données, chacune sur son ordinateur.
+- [ ] Budget prévisionnel par catégorie et alertes de dépassement
+- [ ] Recherche et filtrage des dépenses
+- [ ] Export du récapitulatif et des graphiques (PDF ou image)
+- [ ] (Reporté) Chiffrement de l'instantané pour un transit par un cloud tiers
 
-L'architecture retenue est hors ligne d'abord (offline-first). Chaque machine conserve sa propre base locale ; on n'échange jamais la base vivante, mais des instantanés d'échange que l'on fusionne dans chaque base. La fusion se fait ligne par ligne par identifiant unique, selon la règle « la modification la plus récente l'emporte », et les suppressions se propagent par marqueurs de suppression logique. Cette approche fonctionne sans serveur, reste fiable même si les deux personnes saisissent chacune de leur côté, et le fichier d'échange sert aussi de sauvegarde.
+## Pour les développeurs
 
-### v0.2.0 — Schéma synchronisable
+### Prérequis
 
-- [x] Ajouter au seed une clé textuelle stable par catégorie, indépendante de l'ordre d'insertion
-- [x] Migration de schéma (v3) : ajouter `uuid` (unique), `created_at`, `updated_at` et `deleted` (tombstone) sur `expenses` et `recurring_expenses`
-- [x] Remplir les `uuid` et les horodatages des lignes existantes lors de la migration
-- [x] Activer le mode WAL et les clés étrangères, et exposer un contrôle d'intégrité
-- [x] Remplacer la suppression définitive par une suppression logique (tombstone) dans les dépôts
-- [x] Tests de migration sur un jeu de données réaliste (préservation des données, idempotence, non-régénération)
+Sur Debian ou Ubuntu, installez la chaîne de compilation et Qt 6 :
 
-### v0.2.0 — Moteur d'échange et de fusion
+```sh
+sudo apt install build-essential cmake qt6-base-dev qt6-charts-dev libqt6sql6-sqlite
+```
 
-- [x] Définir un format de fichier d'échange portable et versionné, référençant les catégories par leur clé stable et non par identifiant local
-- [x] Export complet : dépenses et paiements récurrents, marqueurs de suppression compris, vers le fichier d'échange
-- [x] Import avec fusion ligne par ligne par `uuid`, règle « la plus récente l'emporte », propagation des suppressions
-- [x] Idempotence de l'import (réimporter le même fichier ne modifie rien)
-- [x] Journaliser les conflits (la modification écrasée est consignée)
-- [x] Tests du moteur de fusion : ajout des deux côtés, modification concurrente, suppression propagée, réimport idempotent
+Le paquet `libqt6sql6-sqlite` fournit le pilote SQLite de Qt, chargé à l'exécution ; sans lui l'application ne peut pas ouvrir sa base.
 
-### v0.2.0 — Sauvegardes et pérennité
-
-- [x] Sauvegarde automatique horodatée par copie cohérente de la base (`VACUUM INTO`) à l'ouverture ou à la fermeture
-- [x] Rotation des sauvegardes (conserver les N plus récentes)
-- [x] Sauvegarde automatique systématique avant tout import
-- [x] Restauration d'une sauvegarde depuis l'application
-- [x] Documenter le schéma et le format d'échange pour la lisibilité à long terme
-
-### v0.2.0 — Interface d'import / export
-
-- [x] Menu ou onglet Données : exporter vers un fichier, importer depuis un fichier
-- [x] Retour visuel du résultat de la fusion (ajouts, mises à jour, suppressions, conflits)
-- [x] Confirmation avant import, avec rappel que la base est sauvegardée au préalable
-- [x] Tests de l'interface (Qt Test, offscreen)
-
-### v0.3.0 — Synchronisation distante semi-automatique
-
-- [x] Chemin d'un dossier partagé configurable (géré côté système par Syncthing, Nextcloud, Dropbox ou équivalent)
-- [x] Export du fichier d'échange à la fermeture et import avec fusion à l'ouverture
-- [x] Garantie de ne jamais synchroniser la base vivante, uniquement le fichier d'échange
-- [ ] (Optionnel, reporté) Chiffrement du fichier d'échange pour un transit par un cloud tiers
-
-## Construire le projet
-
-> Prérequis (Debian/Ubuntu) : `sudo apt install build-essential cmake qt6-base-dev qt6-charts-dev libqt6sql6-sqlite`. Le paquet `libqt6sql6-sqlite` fournit le pilote SQLite de Qt, chargé à l'exécution ; sans lui l'application ne peut pas ouvrir sa base.
+### Construire et lancer
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -104,9 +140,9 @@ ctest --test-dir build        # lancer les tests
 ./build/grossbuch             # lancer l'application
 ```
 
-## Générer le paquet `.deb`
+### Générer le paquet .deb
 
-> Aucun prérequis supplémentaire : les dépendances du paquet sont déclarées à la main pour rester portables entre distributions, et `dpkg-shlibdeps` est volontairement désactivé (voir docs/adr/0015). La génération ne requiert donc que CMake et CPack.
+Les dépendances du paquet sont déclarées à la main pour rester portables entre distributions, et `dpkg-shlibdeps` est volontairement désactivé (voir docs/adr/0015) : la génération ne requiert donc que CMake et CPack.
 
 ```sh
 cmake --build build --target package
@@ -114,10 +150,18 @@ cmake --build build --target package
 cd build && cpack -G DEB
 ```
 
-Le fichier `grossbuch_<version>-1_amd64.deb` est produit dans `build/`. Installation (apt résout les dépendances runtime) :
+Le fichier `grossbuch_<version>-1_amd64.deb` est produit dans `build/`.
+
+### Générer l'AppImage
+
+Un script assemble une AppImage portable à l'aide de linuxdeploy et de son greffon Qt, téléchargés automatiquement dans `build/` s'ils sont absents (voir docs/adr/0021). Il requiert `curl` en plus des prérequis de compilation.
 
 ```sh
-sudo apt install ./grossbuch_<version>-1_amd64.deb
+bash packaging/build-appimage.sh
 ```
 
-Une release GitHub sur un tag `vX.Y.Z` construit et publie automatiquement ce paquet (voir `.github/workflows/release.yml`).
+Le fichier `grossbuch-x86_64.AppImage` est produit dans `build/`. Pour valider l'empaquetage du pilote SQLite, lancez l'AppImage sur une machine sans Qt installé et vérifiez que la base s'ouvre.
+
+### Publier une release
+
+Une release GitHub sur un tag `vX.Y.Z` construit et publie automatiquement le paquet `.deb` et l'AppImage (voir `.github/workflows/release.yml`). Pensez à mettre à jour la version du projet dans `CMakeLists.txt` et le changelog avant de taguer.

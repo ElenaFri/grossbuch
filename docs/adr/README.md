@@ -23,3 +23,5 @@ Statuts possibles : Proposé, Accepté, Déprécié, Remplacé.
 - [0013 - Sauvegardes automatiques et pérennité des données](0013-sauvegardes-et-perennite.md)
 - [0014 - Retrait de l'export CSV du récapitulatif](0014-retrait-export-csv.md)
 - [0015 - Dépendances .deb portables et indépendantes de la machine de build](0015-paquet-deb-portable.md)
+- [0016 - Navigation par barre de menus et vues empilées](0016-navigation-par-menus.md)
+- [0017 - Affichage par défaut de la seule année en cours dans les graphiques](0017-graphiques-annee-en-cours-par-defaut.md)

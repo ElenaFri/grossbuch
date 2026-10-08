@@ -5,6 +5,8 @@
 #include "core/RecurringRepository.h"
 #include "ui/MainWindow.h"
 
+#include "Version.h"
+
 #include <QApplication>
 #include <QDate>
 #include <QLocale>
@@ -14,7 +16,7 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
     QApplication::setApplicationName(QStringLiteral("grossbuch"));
-    QApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QApplication::setApplicationVersion(QString::fromLatin1(grossbuch::kAppVersion));
     QApplication::setApplicationDisplayName(QStringLiteral("grossbuch"));
 
     // Application francophone : dates et montants toujours au format français,

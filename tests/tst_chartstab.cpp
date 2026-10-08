@@ -29,8 +29,8 @@ private slots:
     void init();
     void cleanup();
 
-    void defaultSelectsThreeMostRecentYears();
-    void fewerThanThreeYearsAllSelected();
+    void defaultSelectsOnlyCurrentYear();
+    void defaultFallsBackToMostRecentWhenCurrentYearAbsent();
     void seriesPlotsMonthlyTotalsInEuros();
     void togglingYearAddsAndRemovesSeries();
     void noDataYieldsNoSeries();
@@ -112,39 +112,37 @@ QStringList ChartsTabTest::seriesNames() const
     return names;
 }
 
-void ChartsTabTest::defaultSelectsThreeMostRecentYears()
+void ChartsTabTest::defaultSelectsOnlyCurrentYear()
 {
-    // Quatre années disponibles : seules les trois dernières sont tracées.
-    addExpense(1000, QDate(2021, 3, 1), QStringLiteral("Courses"));
-    addExpense(1000, QDate(2022, 3, 1), QStringLiteral("Courses"));
-    addExpense(1000, QDate(2023, 3, 1), QStringLiteral("Courses"));
-    addExpense(1000, QDate(2024, 3, 1), QStringLiteral("Courses"));
+    // Plusieurs années disponibles dont l'année en cours : au lancement, seule
+    // celle-ci est tracée (graphique épuré). Les autres restent cochables.
+    const int currentYear = QDate::currentDate().year();
+    addExpense(1000, QDate(currentYear - 2, 3, 1), QStringLiteral("Courses"));
+    addExpense(1000, QDate(currentYear - 1, 3, 1), QStringLiteral("Courses"));
+    addExpense(1000, QDate(currentYear, 3, 1), QStringLiteral("Courses"));
     m_tab->refresh();
 
-    QCOMPARE(chart()->series().size(), 3);
-    QVERIFY(!yearBox(2021)->isChecked());
-    QVERIFY(yearBox(2022)->isChecked());
-    QVERIFY(yearBox(2023)->isChecked());
-    QVERIFY(yearBox(2024)->isChecked());
+    QCOMPARE(chart()->series().size(), 1);
+    QVERIFY(yearBox(currentYear)->isChecked());
+    QVERIFY(!yearBox(currentYear - 1)->isChecked());
+    QVERIFY(!yearBox(currentYear - 2)->isChecked());
 
-    // Chaque courbe porte le nom de son année.
     const QStringList names = seriesNames();
-    QVERIFY(names.contains(QStringLiteral("2022")));
-    QVERIFY(names.contains(QStringLiteral("2023")));
-    QVERIFY(names.contains(QStringLiteral("2024")));
-    QVERIFY(!names.contains(QStringLiteral("2021")));
+    QVERIFY(names.contains(QString::number(currentYear)));
 }
 
-void ChartsTabTest::fewerThanThreeYearsAllSelected()
+void ChartsTabTest::defaultFallsBackToMostRecentWhenCurrentYearAbsent()
 {
-    // Moins de trois années (cas d'un usage récent) : toutes sont tracées.
-    addExpense(1000, QDate(2024, 1, 1), QStringLiteral("Courses"));
-    addExpense(1000, QDate(2025, 1, 1), QStringLiteral("Courses"));
+    // Aucune dépense pour l'année en cours (début d'année, ou base ancienne) :
+    // on affiche alors la dernière année disponible plutôt qu'un graphique vide.
+    const int currentYear = QDate::currentDate().year();
+    addExpense(1000, QDate(currentYear - 3, 1, 1), QStringLiteral("Courses"));
+    addExpense(1000, QDate(currentYear - 2, 1, 1), QStringLiteral("Courses"));
     m_tab->refresh();
 
-    QCOMPARE(chart()->series().size(), 2);
-    QVERIFY(yearBox(2024)->isChecked());
-    QVERIFY(yearBox(2025)->isChecked());
+    QCOMPARE(chart()->series().size(), 1);
+    QVERIFY(yearBox(currentYear - 2)->isChecked()); // la plus récente disponible
+    QVERIFY(!yearBox(currentYear - 3)->isChecked());
 }
 
 void ChartsTabTest::seriesPlotsMonthlyTotalsInEuros()
@@ -172,18 +170,21 @@ void ChartsTabTest::togglingYearAddsAndRemovesSeries()
     addExpense(1000, QDate(2024, 1, 1), QStringLiteral("Courses"));
     addExpense(1000, QDate(2025, 1, 1), QStringLiteral("Courses"));
     m_tab->refresh();
-    QCOMPARE(chart()->series().size(), 2);
+    // Par défaut, seule l'année la plus récente est tracée.
+    QCOMPARE(chart()->series().size(), 1);
+    QVERIFY(seriesNamed(2025) != nullptr);
+    QVERIFY(seriesNamed(2024) == nullptr);
 
-    // Décocher une année retire sa courbe.
+    // Cocher une autre année ajoute sa courbe.
+    yearBox(2024)->setChecked(true);
+    QCOMPARE(chart()->series().size(), 2);
+    QVERIFY(seriesNamed(2024) != nullptr);
+
+    // La redécocher la retire.
     yearBox(2024)->setChecked(false);
     QCOMPARE(chart()->series().size(), 1);
     QVERIFY(seriesNamed(2024) == nullptr);
     QVERIFY(seriesNamed(2025) != nullptr);
-
-    // La recocher la rétablit.
-    yearBox(2024)->setChecked(true);
-    QCOMPARE(chart()->series().size(), 2);
-    QVERIFY(seriesNamed(2024) != nullptr);
 }
 
 void ChartsTabTest::noDataYieldsNoSeries()

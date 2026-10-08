@@ -18,14 +18,14 @@ Les choix techniques, l'architecture et le modèle de données sont documentés 
 
 ## Fonctionnalités existantes
 
-L'application s'organise autour de six onglets.
+L'application se pilote par une barre de menus (Fichier, Édition, Affichage, Aide) et n'affiche qu'une vue à la fois ; les raccourcis Ctrl+1 à Ctrl+4 permettent de passer de l'une à l'autre. Au lancement, la vue Graphiques est affichée.
 
-- Saisie : enregistrement d'une dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante groupée, modification et suppression d'une dépense, et liste des dépenses du mois en cours.
-- Paiements récurrents : modèles de dépenses qui reviennent chaque mois, matérialisés automatiquement sur le mois en cours, modifiables pour l'avenir seulement et désactivables ou réactivables sans perte de l'historique.
-- Récapitulatif : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général.
-- Graphiques annuels : courbes des dépenses totales mensuelles superposées d'une année sur l'autre, les trois dernières années par défaut, avec sélection des années visibles.
-- Données : export vers un fichier d'échange, import avec fusion (rapport affiché), et restauration d'une sauvegarde choisie dans la liste.
-- À propos : nom et version de l'application, licence, auteur, lien vers le dépôt et version de Qt.
+- Saisie des dépenses (menu Édition) : enregistrement d'une dépense (montant, date, libellé optionnel) avec sélection de la (sous-)catégorie dans une liste déroulante groupée, modification et suppression d'une dépense, et liste des dépenses du mois en cours.
+- Dépenses récurrentes (menu Édition) : modèles de dépenses qui reviennent chaque mois, matérialisés automatiquement sur le mois en cours, modifiables pour l'avenir seulement et désactivables ou réactivables sans perte de l'historique.
+- Récapitulatif (menu Affichage) : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général.
+- Graphiques annuels (menu Affichage) : courbes des dépenses totales mensuelles superposables d'une année sur l'autre ; au lancement, seule l'année en cours est tracée, les autres restant sélectionnables.
+- Échange et sauvegardes (menu Fichier) : export vers un fichier d'échange, import avec fusion (rapport affiché), et restauration d'une sauvegarde choisie dans une liste.
+- Aide (menu Aide) : guide d'utilisation concis et boîte À propos (nom, version, licence, auteur, lien vers le dépôt et version de Qt).
 
 Socle technique : stockage local SQLite, montants stockés en centimes pour éviter les erreurs d'arrondi, interface francophone, persistance de l'état de la fenêtre, distribution en paquet `.deb` et release GitHub automatisée sur les tags.
 

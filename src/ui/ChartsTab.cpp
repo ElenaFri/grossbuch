@@ -24,9 +24,6 @@ namespace grossbuch {
 
 namespace {
 
-// Nombre d'années affichées par défaut (les plus récentes). Voir docs/adr/0007.
-constexpr int DefaultVisibleYears = 3;
-
 QStringList shortMonthNames()
 {
     const QLocale locale;
@@ -90,12 +87,14 @@ void ChartsTab::syncYearCheckboxes()
             checked.insert(it.key());
     }
 
-    // Au tout premier remplissage avec des données, coche les dernières années.
+    // Au tout premier remplissage avec des données, on n'affiche que l'année en
+    // cours (ou, à défaut de données cette année-là, la plus récente disponible)
+    // pour un graphique épuré au lancement. Voir docs/adr/0017.
     if (!m_defaultsApplied && !years.isEmpty()) {
         checked.clear();
-        const int first = std::max(0, static_cast<int>(years.size()) - DefaultVisibleYears);
-        for (int i = first; i < years.size(); ++i)
-            checked.insert(years.at(i));
+        const int currentYear = QDate::currentDate().year();
+        const int defaultYear = years.contains(currentYear) ? currentYear : years.last();
+        checked.insert(defaultYear);
         m_defaultsApplied = true;
     }
 

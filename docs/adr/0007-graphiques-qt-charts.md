@@ -4,7 +4,7 @@ Date : 2026-10-05
 
 ## Statut
 
-Accepté
+Accepté. La règle d'affichage par défaut des trois dernières années est remplacée par l'ADR 0017 (affichage par défaut de la seule année en cours).
 
 ## Contexte
 

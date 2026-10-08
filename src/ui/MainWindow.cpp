@@ -4,20 +4,39 @@
 #include "core/Database.h"
 #include "core/DataController.h"
 #include "core/ExpenseRepository.h"
-#include "ui/AboutTab.h"
+#include "ui/AboutDialog.h"
 #include "ui/ChartsTab.h"
-#include "ui/DataTab.h"
 #include "ui/EntryTab.h"
+#include "ui/GuideDialog.h"
 #include "ui/RecurringTab.h"
+#include "ui/RestoreDialog.h"
 #include "ui/SummaryTab.h"
 
+#include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDateTime>
+#include <QDir>
+#include <QFileDialog>
 #include <QIcon>
+#include <QKeySequence>
+#include <QMenu>
+#include <QMenuBar>
+#include <QMessageBox>
 #include <QProcess>
-#include <QTabWidget>
+#include <QStackedWidget>
+#include <QStandardPaths>
 
 namespace grossbuch {
+
+// Index des vues dans la pile (et valeurs portées par les actions de navigation).
+namespace {
+constexpr int ViewEntry = 0;
+constexpr int ViewRecurring = 1;
+constexpr int ViewSummary = 2;
+constexpr int ViewCharts = 3;
+} // namespace
 
 MainWindow::MainWindow(Database &database, CategoryRepository &categories,
                        ExpenseRepository &expenses, RecurringRepository &recurring, QWidget *parent)
@@ -25,7 +44,6 @@ MainWindow::MainWindow(Database &database, CategoryRepository &categories,
       m_recurring(recurring)
 {
     setWindowTitle(QStringLiteral("grossbuch"));
-    // Icône de thème en attendant l'icône dédiée (Phase 9).
     setWindowIcon(QIcon::fromTheme(QStringLiteral("accessories-calculator")));
     resize(900, 600);
 
@@ -35,38 +53,105 @@ MainWindow::MainWindow(Database &database, CategoryRepository &categories,
     m_recurringTab = new RecurringTab(m_categories, m_recurring);
     m_summaryTab = new SummaryTab(m_categories, m_expenses);
     m_chartsTab = new ChartsTab(m_expenses);
-    m_dataTab = new DataTab(*m_dataController);
-    m_aboutTab = new AboutTab;
 
-    m_tabs = new QTabWidget(this);
-    m_tabs->addTab(m_entryTab, tr("Saisie"));
-    m_tabs->addTab(m_recurringTab, tr("Récurrents"));
-    m_tabs->addTab(m_summaryTab, tr("Récapitulatif"));
-    m_tabs->addTab(m_chartsTab, tr("Graphiques"));
-    m_tabs->addTab(m_dataTab, tr("Données"));
-    m_tabs->addTab(m_aboutTab, tr("À propos"));
-    setCentralWidget(m_tabs);
+    m_views = new QStackedWidget(this);
+    m_views->insertWidget(ViewEntry, m_entryTab);
+    m_views->insertWidget(ViewRecurring, m_recurringTab);
+    m_views->insertWidget(ViewSummary, m_summaryTab);
+    m_views->insertWidget(ViewCharts, m_chartsTab);
+    setCentralWidget(m_views);
+
+    createMenus();
 
     connect(m_entryTab, &EntryTab::expensesChanged, this, &MainWindow::onExpensesChanged);
     connect(m_recurringTab, &RecurringTab::recurringChanged, this,
             &MainWindow::onRecurringChanged);
-    connect(m_dataController, &DataController::dataChanged, this, &MainWindow::refreshAllTabs);
-    connect(m_dataTab, &DataTab::restoreCompleted, this, &MainWindow::onRestoreCompleted);
+    connect(m_dataController, &DataController::dataChanged, this, &MainWindow::refreshAllViews);
 
-    // Restaure l'état sauvegardé lors de la dernière session.
+    // Restaure la géométrie de la dernière session.
     const QByteArray geometry = m_settings.value(QStringLiteral("ui/geometry")).toByteArray();
     if (!geometry.isEmpty())
         restoreGeometry(geometry);
 
-    const int lastTab = m_settings.value(QStringLiteral("ui/currentTab"), 0).toInt();
-    if (lastTab >= 0 && lastTab < m_tabs->count())
-        m_tabs->setCurrentIndex(lastTab);
+    // Au lancement, on affiche toujours les graphiques (année en cours comprise).
+    // Les autres vues s'ouvrent à la demande via les menus.
+    setCurrentView(ViewCharts);
+}
+
+void MainWindow::createMenus()
+{
+    // --- Fichier ------------------------------------------------------------
+    QMenu *fileMenu = menuBar()->addMenu(tr("&Fichier"));
+    QAction *importAction = fileMenu->addAction(tr("&Importer des données…"));
+    importAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_O));
+    connect(importAction, &QAction::triggered, this, &MainWindow::onImport);
+
+    QAction *exportAction = fileMenu->addAction(tr("&Exporter des données…"));
+    exportAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+    connect(exportAction, &QAction::triggered, this, &MainWindow::onExport);
+
+    QAction *restoreAction = fileMenu->addAction(tr("&Restaurer une sauvegarde…"));
+    connect(restoreAction, &QAction::triggered, this, &MainWindow::onRestore);
+
+    fileMenu->addSeparator();
+    QAction *quitAction = fileMenu->addAction(tr("&Quitter"));
+    quitAction->setShortcut(QKeySequence::Quit);
+    connect(quitAction, &QAction::triggered, this, &MainWindow::close);
+
+    // Groupe exclusif pour les vues : une seule cochée à la fois, dans les menus
+    // Édition/Affichage comme dans la barre d'outils.
+    m_viewActions = new QActionGroup(this);
+    m_viewActions->setExclusive(true);
+
+    // --- Édition (vues de saisie) ------------------------------------------
+    QMenu *editMenu = menuBar()->addMenu(tr("&Édition"));
+    addViewAction(editMenu, tr("&Saisie des dépenses"), ViewEntry,
+                  QKeySequence(Qt::CTRL | Qt::Key_1));
+    addViewAction(editMenu, tr("&Dépenses récurrentes"), ViewRecurring,
+                  QKeySequence(Qt::CTRL | Qt::Key_2));
+
+    // --- Affichage (vues de consultation) ----------------------------------
+    QMenu *viewMenu = menuBar()->addMenu(tr("&Affichage"));
+    addViewAction(viewMenu, tr("&Récapitulatif"), ViewSummary,
+                  QKeySequence(Qt::CTRL | Qt::Key_3));
+    addViewAction(viewMenu, tr("&Graphiques"), ViewCharts, QKeySequence(Qt::CTRL | Qt::Key_4));
+
+    // --- Aide ---------------------------------------------------------------
+    QMenu *helpMenu = menuBar()->addMenu(tr("&Aide"));
+    QAction *guideAction = helpMenu->addAction(tr("&Guide d'utilisation"));
+    guideAction->setShortcut(QKeySequence::HelpContents);
+    connect(guideAction, &QAction::triggered, this, &MainWindow::onGuide);
+
+    QAction *aboutAction = helpMenu->addAction(tr("À &propos de grossbuch"));
+    connect(aboutAction, &QAction::triggered, this, &MainWindow::onAbout);
+}
+
+QAction *MainWindow::addViewAction(QMenu *menu, const QString &text, int index,
+                                   const QKeySequence &shortcut)
+{
+    QAction *action = menu->addAction(text);
+    action->setCheckable(true);
+    action->setShortcut(shortcut);
+    action->setData(index);
+    m_viewActions->addAction(action);
+    connect(action, &QAction::triggered, this, [this, index]() { setCurrentView(index); });
+    return action;
+}
+
+void MainWindow::setCurrentView(int index)
+{
+    if (index < 0 || index >= m_views->count())
+        return;
+    m_views->setCurrentIndex(index);
+    // Synchronise la coche de l'action correspondante (sans break : S1751).
+    const QList<QAction *> actions = m_viewActions->actions();
+    for (QAction *action : actions)
+        action->setChecked(action->data().toInt() == index);
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     m_settings.setValue(QStringLiteral("ui/geometry"), saveGeometry());
-    m_settings.setValue(QStringLiteral("ui/currentTab"), m_tabs->currentIndex());
     QMainWindow::closeEvent(event);
 }
 
@@ -85,19 +170,80 @@ void MainWindow::onRecurringChanged()
     m_chartsTab->refresh();
 }
 
-void MainWindow::refreshAllTabs()
+void MainWindow::refreshAllViews()
 {
     m_entryTab->refresh();
     m_recurringTab->refresh();
     m_summaryTab->refresh();
     m_chartsTab->refresh();
-    m_dataTab->refresh();
 }
 
-void MainWindow::onRestoreCompleted()
+void MainWindow::onExport()
 {
+    const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString defaultName =
+        QStringLiteral("grossbuch_backup_%1.json")
+            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss")));
+    const QString suggested = QDir(documents).filePath(defaultName);
+
+    const QString path = QFileDialog::getSaveFileName(
+        this, tr("Exporter les données"), suggested, tr("Fichier d'échange (*.json)"));
+    if (path.isEmpty())
+        return;
+
+    const DataController::Result result = m_dataController->exportToFile(path);
+    if (result.ok)
+        QMessageBox::information(this, tr("Exporter les données"), result.message);
+    else
+        QMessageBox::warning(this, tr("Export impossible"), result.message);
+}
+
+void MainWindow::onImport()
+{
+    const QMessageBox::StandardButton confirm = QMessageBox::question(
+        this, tr("Importer des données"),
+        tr("L'import fusionne le fichier choisi avec vos données actuelles.\n"
+           "Une sauvegarde complète est créée automatiquement au préalable.\n\n"
+           "Continuer ?"),
+        QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+    if (confirm != QMessageBox::Yes)
+        return;
+
+    const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Importer des données"), documents, tr("Fichier d'échange (*.json)"));
+    if (path.isEmpty())
+        return;
+
+    // Un import réussi émet dataChanged() : les vues se rafraîchissent via le signal.
+    const DataController::Result result = m_dataController->importFromFile(path);
+    if (result.ok)
+        QMessageBox::information(this, tr("Importer des données"), result.message);
+    else
+        QMessageBox::warning(this, tr("Import impossible"), result.message);
+}
+
+void MainWindow::onRestore()
+{
+    RestoreDialog dialog(*m_dataController, this);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    // La restauration a réussi : la base est fermée, on redémarre l'application.
     QProcess::startDetached(QApplication::applicationFilePath(), QApplication::arguments());
     QApplication::quit();
+}
+
+void MainWindow::onAbout()
+{
+    AboutDialog dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::onGuide()
+{
+    GuideDialog dialog(this);
+    dialog.exec();
 }
 
 } // namespace grossbuch

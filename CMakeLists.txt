@@ -31,7 +31,7 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets Sql Test Charts)
 enable_testing()
 
 # --- En-tête de version généré ----------------------------------------------
-# Expose PROJECT_VERSION au code sous forme de constante (voir src/ui/AboutTab).
+# Expose PROJECT_VERSION au code sous forme de constante (voir src/ui/AboutDialog).
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/src/Version.h.in
     ${CMAKE_CURRENT_BINARY_DIR}/generated/Version.h
@@ -64,8 +64,9 @@ add_library(grossbuch_ui STATIC
     src/ui/RecurringTab.cpp
     src/ui/SummaryTab.cpp
     src/ui/ChartsTab.cpp
-    src/ui/DataTab.cpp
-    src/ui/AboutTab.cpp
+    src/ui/AboutDialog.cpp
+    src/ui/GuideDialog.cpp
+    src/ui/RestoreDialog.cpp
     src/ui/UiHelpers.cpp
 )
 

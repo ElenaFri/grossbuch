@@ -2,26 +2,30 @@
 #include "core/Database.h"
 #include "core/ExpenseRepository.h"
 #include "core/RecurringRepository.h"
+#include "ui/AboutDialog.h"
 #include "ui/MainWindow.h"
 
 #include "Version.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QLabel>
 #include <QLocale>
-#include <QPushButton>
+#include <QMenuBar>
 #include <QSettings>
+#include <QStackedWidget>
 #include <QStandardPaths>
-#include <QTabWidget>
+#include <QToolBar>
 #include <QtTest>
 
 #include <memory>
 
 using namespace grossbuch;
 
-// Test de la persistance de l'état de l'interface (dernier onglet) via QSettings.
-// Le mode test de QStandardPaths redirige la configuration vers un emplacement
-// temporaire : on ne touche jamais à la configuration réelle de l'utilisateur.
+// Test de l'état de l'interface (vue par défaut au lancement, absence de barre
+// d'outils) et de la présence des actions de menu. Le mode test de QStandardPaths
+// redirige la configuration vers un emplacement temporaire : on ne touche jamais
+// à la configuration réelle de l'utilisateur. Voir docs/adr/0016.
 class UiStateTest : public QObject
 {
     Q_OBJECT
@@ -30,13 +34,14 @@ private slots:
     void initTestCase();
     void init();
 
-    void lastTabIsRestored();
-    void outOfRangeTabFallsBackToFirst();
-    void dataTabExposesActions();
-    void aboutTabShowsVersion();
+    void opensOnChartsView();
+    void hasNoNavigationToolbar();
+    void menusExposeActions();
+    void aboutDialogShowsVersion();
 
 private:
     std::unique_ptr<MainWindow> makeWindow();
+    static QStringList actionTexts(const MainWindow *window);
 
     std::unique_ptr<Database> m_db;
     std::unique_ptr<CategoryRepository> m_categories;
@@ -70,67 +75,97 @@ std::unique_ptr<MainWindow> UiStateTest::makeWindow()
     return std::make_unique<MainWindow>(*m_db, *m_categories, *m_expenses, *m_recurring);
 }
 
-void UiStateTest::lastTabIsRestored()
+QStringList UiStateTest::actionTexts(const MainWindow *window)
 {
+    QStringList texts;
+    const QList<QAction *> actions = window->findChildren<QAction *>();
+    for (const QAction *action : actions)
+        texts.append(action->text());
+    return texts;
+}
+
+void UiStateTest::opensOnChartsView()
+{
+    // Index de la vue Graphiques dans la pile (ViewCharts).
+    constexpr int chartsIndex = 3;
+
     {
         auto window = makeWindow();
-        auto *tabs = window->findChild<QTabWidget *>();
-        QVERIFY(tabs != nullptr);
-        QCOMPARE(tabs->count(), 6);
-        tabs->setCurrentIndex(2);
-        // La fermeture déclenche la sauvegarde dans closeEvent.
+        auto *stack = window->findChild<QStackedWidget *>();
+        QVERIFY(stack != nullptr);
+        QCOMPARE(stack->count(), 4);
+        // Au lancement, la vue affichée est toujours les graphiques.
+        QCOMPARE(stack->currentIndex(), chartsIndex);
+
+        // On bascule ailleurs puis on ferme : la vue n'est volontairement pas
+        // mémorisée d'une session à l'autre.
+        QAction *target = nullptr;
+        const QList<QAction *> actions = window->findChildren<QAction *>();
+        for (QAction *action : actions) {
+            if (action->data().isValid() && action->data().toInt() == 2 && target == nullptr)
+                target = action;
+        }
+        QVERIFY(target != nullptr);
+        target->trigger();
+        QCOMPARE(stack->currentIndex(), 2);
         window->close();
     }
 
-    // Une nouvelle fenêtre doit rouvrir sur le dernier onglet consulté.
+    // Une nouvelle fenêtre rouvre sur les graphiques, pas sur la dernière vue.
     auto window = makeWindow();
-    auto *tabs = window->findChild<QTabWidget *>();
-    QVERIFY(tabs != nullptr);
-    QCOMPARE(tabs->currentIndex(), 2);
+    auto *stack = window->findChild<QStackedWidget *>();
+    QVERIFY(stack != nullptr);
+    QCOMPARE(stack->currentIndex(), chartsIndex);
 }
 
-void UiStateTest::outOfRangeTabFallsBackToFirst()
+void UiStateTest::hasNoNavigationToolbar()
 {
-    // Un index invalide en configuration (par ex. après suppression d'un onglet)
-    // ne doit pas faire planter : on retombe sur le premier onglet.
-    QSettings settings(QStringLiteral("grossbuch"), QStringLiteral("grossbuch"));
-    settings.setValue(QStringLiteral("ui/currentTab"), 99);
-    settings.sync();
-
+    // La navigation passe exclusivement par les menus : aucune barre d'outils ni
+    // action de bascule ne doit subsister.
     auto window = makeWindow();
-    auto *tabs = window->findChild<QTabWidget *>();
-    QVERIFY(tabs != nullptr);
-    QCOMPARE(tabs->currentIndex(), 0);
+    QVERIFY(window->findChildren<QToolBar *>().isEmpty());
+    const QStringList texts = actionTexts(window.get());
+    QVERIFY(texts.filter(QStringLiteral("outils")).isEmpty());
 }
 
-// L'onglet Données expose les boutons d'export, d'import et de restauration.
-void UiStateTest::dataTabExposesActions()
+// La barre de menus expose les actions attendues (échange de données,
+// navigation entre vues et aide).
+void UiStateTest::menusExposeActions()
 {
     auto window = makeWindow();
 
-    const QList<QPushButton *> buttons = window->findChildren<QPushButton *>();
-    bool hasExport = false;
-    bool hasImport = false;
-    bool hasRestore = false;
-    for (const QPushButton *button : buttons) {
-        if (button->text().contains(QStringLiteral("Exporter")))
-            hasExport = true;
-        if (button->text().contains(QStringLiteral("Importer")))
-            hasImport = true;
-        if (button->text().contains(QStringLiteral("Restaurer")))
-            hasRestore = true;
-    }
-    QVERIFY(hasExport);
-    QVERIFY(hasImport);
-    QVERIFY(hasRestore);
+    // Les quatre menus de premier niveau.
+    const QList<QAction *> topLevel = window->menuBar()->actions();
+    QStringList menuTitles;
+    for (const QAction *menu : topLevel)
+        menuTitles.append(menu->text());
+    QVERIFY(menuTitles.filter(QStringLiteral("Fichier")).size() == 1);
+    QVERIFY(menuTitles.filter(QStringLiteral("Édition")).size() == 1);
+    QVERIFY(menuTitles.filter(QStringLiteral("Affichage")).size() == 1);
+    QVERIFY(menuTitles.filter(QStringLiteral("Aide")).size() == 1);
+
+    // Les actions essentielles, repérées par leur libellé.
+    const QStringList texts = actionTexts(window.get());
+    const auto hasAction = [&texts](const QString &needle) {
+        return !texts.filter(needle).isEmpty();
+    };
+    QVERIFY(hasAction(QStringLiteral("Importer")));
+    QVERIFY(hasAction(QStringLiteral("Exporter")));
+    QVERIFY(hasAction(QStringLiteral("Restaurer")));
+    QVERIFY(hasAction(QStringLiteral("Saisie des dépenses")));
+    QVERIFY(hasAction(QStringLiteral("Dépenses récurrentes")));
+    QVERIFY(hasAction(QStringLiteral("Récapitulatif")));
+    QVERIFY(hasAction(QStringLiteral("Graphiques")));
+    QVERIFY(hasAction(QStringLiteral("Guide")));
+    QVERIFY(hasAction(QStringLiteral("propos")));
 }
 
-// L'onglet À propos affiche la version de l'application (celle du build).
-void UiStateTest::aboutTabShowsVersion()
+// La boîte de dialogue À propos affiche la version de l'application (du build).
+void UiStateTest::aboutDialogShowsVersion()
 {
-    auto window = makeWindow();
+    AboutDialog dialog;
 
-    const QList<QLabel *> labels = window->findChildren<QLabel *>();
+    const QList<QLabel *> labels = dialog.findChildren<QLabel *>();
     bool hasVersion = false;
     for (const QLabel *label : labels) {
         if (label->objectName() == QStringLiteral("aboutVersion")

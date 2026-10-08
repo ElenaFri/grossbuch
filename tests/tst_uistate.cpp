@@ -3,20 +3,31 @@
 #include "core/ExpenseRepository.h"
 #include "core/RecurringRepository.h"
 #include "ui/AboutDialog.h"
+#include "ui/EntryTab.h"
 #include "ui/MainWindow.h"
+#include "ui/RecurringTab.h"
+#include "ui/SummaryTab.h"
+#include "ui/UiHelpers.h"
 
 #include "Version.h"
 
 #include <QAction>
 #include <QApplication>
+#include <QComboBox>
+#include <QDateEdit>
+#include <QDoubleSpinBox>
 #include <QGuiApplication>
 #include <QLabel>
+#include <QLineEdit>
 #include <QLocale>
 #include <QMenuBar>
+#include <QPushButton>
 #include <QSettings>
 #include <QSignalSpy>
+#include <QSpinBox>
 #include <QStackedWidget>
 #include <QStandardPaths>
+#include <QTableWidget>
 #include <QTimer>
 #include <QToolBar>
 #include <QtTest>
@@ -41,6 +52,8 @@ private slots:
     void hasNoNavigationToolbar();
     void menusExposeActions();
     void aboutDialogShowsVersion();
+    void addingExpenseRefreshesSummary();
+    void addingRecurringRefreshesEntry();
     void quittingClosesWithoutLingering();
 
 private:
@@ -190,6 +203,106 @@ void UiStateTest::menusExposeActions()
     QVERIFY(hasAction(QStringLiteral("Graphiques")));
     QVERIFY(hasAction(QStringLiteral("Guide")));
     QVERIFY(hasAction(QStringLiteral("propos")));
+}
+
+// Intégration : saisir une dépense depuis l'onglet Saisie doit rafraîchir le
+// Récapitulatif (câblage expensesChanged -> onExpensesChanged dans MainWindow).
+// On n'inspecte pas d'état interne : on bascule sur la vraie vue, on remplit le
+// formulaire comme un utilisateur et on vérifie l'effet observable (le total du
+// mois affiché par le récapitulatif).
+void UiStateTest::addingExpenseRefreshesSummary()
+{
+    auto window = makeWindow();
+
+    // Bascule sur la vue Saisie (index 0) via l'action de menu.
+    QAction *entryView = viewAction(window.get(), 0);
+    QVERIFY(entryView != nullptr);
+    if (entryView == nullptr)
+        return;
+    entryView->trigger();
+
+    auto *entry = window->findChild<EntryTab *>();
+    auto *summary = window->findChild<SummaryTab *>();
+    QVERIFY(entry != nullptr);
+    QVERIFY(summary != nullptr);
+    if (entry == nullptr || summary == nullptr)
+        return;
+
+    // Le récapitulatif s'ouvre sur le mois en cours : il est vide au départ.
+    auto *total = summary->findChild<QLabel *>(QStringLiteral("totalLabel"));
+    QVERIFY(total != nullptr);
+    if (total == nullptr)
+        return;
+    QVERIFY(total->text().contains(formatMoney(0)));
+
+    // Saisie d'une dépense datée du jour (catégorie valide déjà sélectionnée).
+    auto *amountSpin = entry->findChild<QDoubleSpinBox *>(QStringLiteral("amountSpin"));
+    auto *saveButton = entry->findChild<QPushButton *>(QStringLiteral("saveButton"));
+    QVERIFY(amountSpin != nullptr);
+    QVERIFY(saveButton != nullptr);
+    if (amountSpin == nullptr || saveButton == nullptr)
+        return;
+    amountSpin->setValue(12.34);
+    saveButton->click();
+
+    // Sans action manuelle sur le récapitulatif, son total reflète la dépense :
+    // c'est la preuve que le signal a bien déclenché son rafraîchissement.
+    QVERIFY(total->text().contains(formatMoney(1234)));
+}
+
+// Intégration : créer un paiement récurrent matérialise une occurrence pour le
+// mois courant, ce qui doit rafraîchir l'onglet Saisie (câblage recurringChanged
+// -> onRecurringChanged). On vérifie que la table de saisie expose la nouvelle
+// dépense sans avoir touché à cet onglet.
+void UiStateTest::addingRecurringRefreshesEntry()
+{
+    auto window = makeWindow();
+
+    QAction *recurringView = viewAction(window.get(), 1);
+    QVERIFY(recurringView != nullptr);
+    if (recurringView == nullptr)
+        return;
+    recurringView->trigger();
+
+    auto *recurring = window->findChild<RecurringTab *>();
+    auto *entry = window->findChild<EntryTab *>();
+    QVERIFY(recurring != nullptr);
+    QVERIFY(entry != nullptr);
+    if (recurring == nullptr || entry == nullptr)
+        return;
+
+    auto *entryTable = entry->findChild<QTableWidget *>(QStringLiteral("expensesTable"));
+    QVERIFY(entryTable != nullptr);
+    if (entryTable == nullptr)
+        return;
+    QCOMPARE(entryTable->rowCount(), 0);
+
+    // Remplit le formulaire de récurrent et l'enregistre.
+    auto *amountSpin = recurring->findChild<QDoubleSpinBox *>(QStringLiteral("recAmountSpin"));
+    auto *categoryCombo = recurring->findChild<QComboBox *>(QStringLiteral("recCategoryCombo"));
+    auto *startEdit = recurring->findChild<QDateEdit *>(QStringLiteral("recStartEdit"));
+    auto *saveButton = recurring->findChild<QPushButton *>(QStringLiteral("recSaveButton"));
+    QVERIFY(amountSpin != nullptr);
+    QVERIFY(categoryCombo != nullptr);
+    QVERIFY(startEdit != nullptr);
+    QVERIFY(saveButton != nullptr);
+    if (amountSpin == nullptr || categoryCombo == nullptr || startEdit == nullptr
+        || saveButton == nullptr)
+        return;
+
+    const int categoryId = m_categories->selectable().first().id;
+    const int comboIndex = categoryCombo->findData(categoryId);
+    QVERIFY(comboIndex >= 0);
+    categoryCombo->setCurrentIndex(comboIndex);
+
+    const QDate today = QDate::currentDate();
+    amountSpin->setValue(42.00);
+    startEdit->setDate(QDate(today.year(), today.month(), 1));
+    saveButton->click();
+
+    // L'occurrence matérialisée apparaît dans la table de saisie du mois courant,
+    // preuve que l'onglet Saisie a été rafraîchi par le signal.
+    QCOMPARE(entryTable->rowCount(), 1);
 }
 
 // La boîte de dialogue À propos affiche la version de l'application (du build).

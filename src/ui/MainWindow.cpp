@@ -178,6 +178,11 @@ void MainWindow::refreshAllViews()
     m_chartsTab->refresh();
 }
 
+// Les slots suivants pilotent des dialogues natifs modaux (QFileDialog,
+// QMessageBox) et, pour la restauration, relancent l'application via QProcess.
+// Ils ne sont pas couvrables sans automatisation fragile de fenêtres modales :
+// exclus de la mesure de couverture. Voir docs/adr/0019.
+// LCOV_EXCL_START
 void MainWindow::onExport()
 {
     const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
@@ -245,5 +250,6 @@ void MainWindow::onGuide()
     GuideDialog dialog(this);
     dialog.exec();
 }
+// LCOV_EXCL_STOP
 
 } // namespace grossbuch

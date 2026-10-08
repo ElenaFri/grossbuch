@@ -107,3 +107,15 @@ target_compile_options(tst_recurringtab PRIVATE
 add_test(NAME tst_recurringtab COMMAND tst_recurringtab)
 # Exécution sans serveur graphique.
 set_tests_properties(tst_recurringtab PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Tests du dialogue de restauration (Qt Test, Widgets). Voir docs/adr/0013 et 0016.
+add_executable(tst_restoredialog tst_restoredialog.cpp)
+target_link_libraries(tst_restoredialog PRIVATE grossbuch_ui Qt6::Test)
+
+target_compile_options(tst_restoredialog PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_restoredialog COMMAND tst_restoredialog)
+# Exécution sans serveur graphique.
+set_tests_properties(tst_restoredialog PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

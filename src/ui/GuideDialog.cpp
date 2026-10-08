@@ -6,6 +6,10 @@
 
 namespace grossbuch {
 
+// Contenu d'aide statique uniquement : aucune logique à tester. Exclu de la mesure
+// de couverture (un test se réduirait à vérifier que du texte contient du texte).
+// Voir docs/adr/0019.
+// LCOV_EXCL_START
 GuideDialog::GuideDialog(QWidget *parent) : QDialog(parent)
 {
     setWindowTitle(tr("Guide d'utilisation"));
@@ -49,5 +53,6 @@ GuideDialog::GuideDialog(QWidget *parent) : QDialog(parent)
     layout->addWidget(browser);
     layout->addWidget(buttons);
 }
+// LCOV_EXCL_STOP
 
 } // namespace grossbuch

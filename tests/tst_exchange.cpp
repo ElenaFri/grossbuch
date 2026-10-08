@@ -9,6 +9,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QFile>
 #include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QVariant>
@@ -36,8 +37,13 @@ private slots:
     void deletionPropagatesViaTombstone();
     void reimportIsIdempotent();
     void deterministicOccurrenceUuidPreventsDuplicates();
+    void recurringModificationMergesAndKeepsMarker();
     void unknownCategoryIsSkipped();
+    void unknownCategorySkipsRecurring();
     void unsupportedFormatIsRejected();
+    void nonObjectRootIsRejected();
+    void malformedJsonFileIsRejected();
+    void missingImportFileIsReported();
 
 private:
     static int categoryIdByKey(const CategoryRepository &categories, const QString &key);
@@ -46,6 +52,8 @@ private:
     // Force l'horodatage de mise à jour d'une dépense (résolution ISO à la
     // seconde : on « plante » une valeur pour rendre l'ordre déterministe).
     static void forceExpenseUpdatedAt(Database &db, int id, const QString &timestamp);
+    // Équivalent pour un modèle récurrent.
+    static void forceRecurringUpdatedAt(Database &db, int id, const QString &timestamp);
 
     std::unique_ptr<QTemporaryDir> m_dir;
 };
@@ -86,6 +94,15 @@ void ExchangeTest::forceExpenseUpdatedAt(Database &db, int id, const QString &ti
 {
     QSqlQuery query(db.connection());
     query.prepare(QStringLiteral("UPDATE expenses SET updated_at = ? WHERE id = ?"));
+    query.addBindValue(timestamp);
+    query.addBindValue(id);
+    QVERIFY(query.exec());
+}
+
+void ExchangeTest::forceRecurringUpdatedAt(Database &db, int id, const QString &timestamp)
+{
+    QSqlQuery query(db.connection());
+    query.prepare(QStringLiteral("UPDATE recurring_expenses SET updated_at = ? WHERE id = ?"));
     query.addBindValue(timestamp);
     query.addBindValue(id);
     QVERIFY(query.exec());
@@ -410,6 +427,81 @@ void ExchangeTest::deterministicOccurrenceUuidPreventsDuplicates()
     QCOMPARE(expB.forMonth(2025, 2).size(), 1);
 }
 
+// Fusion d'un modèle récurrent modifié : la version la plus récente l'emporte et
+// un conflit est journalisé, mais surtout le repère de matérialisation ne doit
+// jamais reculer. Scénario réel : A relève le montant d'un abonnement, alors que
+// B a déjà matérialisé plusieurs mois ; après import de la version d'A, B garde
+// son montant à jour sans re-matérialiser les mois passés. Voir docs/adr/0012.
+void ExchangeTest::recurringModificationMergesAndKeepsMarker()
+{
+    const QString fileA = m_dir->filePath(QStringLiteral("a.db"));
+    const QString fileB = m_dir->filePath(QStringLiteral("b.db"));
+    const QString seed = m_dir->filePath(QStringLiteral("seed.json"));
+    const QString fromA = m_dir->filePath(QStringLiteral("from-a.json"));
+
+    Database a(fileA, QStringLiteral("recmod-a"));
+    Database b(fileB, QStringLiteral("recmod-b"));
+    QVERIFY(a.open());
+    QVERIFY(b.open());
+
+    CategoryRepository catA(a);
+    RecurringRepository recA(a);
+    const int train = categoryIdByKey(catA, QStringLiteral("deplacements.train"));
+    QVERIFY(train > 0);
+
+    RecurringExpense model;
+    model.amountCents = 5000;
+    model.label = QStringLiteral("Abonnement");
+    model.categoryId = train;
+    model.dayOfMonth = 5;
+    model.startYear = 2025;
+    model.startMonth = 1;
+    const std::optional<int> idA = recA.add(model);
+    QVERIFY(idA.has_value());
+
+    // B reçoit le modèle (même uuid) via un premier échange, puis matérialise
+    // jusqu'en juin 2025 : son repère avance à 2025-06.
+    ExchangeService serviceA(a);
+    ExchangeService serviceB(b);
+    QString error;
+    QVERIFY2(serviceA.exportToFile(seed, &error), qPrintable(error));
+    MergeReport seedReport;
+    QVERIFY2(serviceB.importFromFile(seed, seedReport, &error), qPrintable(error));
+    QCOMPARE(seedReport.recurringAdded, 1);
+
+    RecurringRepository recB(b);
+    QVERIFY(recB.materializeDueOccurrences(QDate(2025, 6, 30)) > 0);
+    const RecurringExpense beforeMerge = recB.all().first();
+    QCOMPARE(beforeMerge.lastYear, 2025);
+    QCOMPARE(beforeMerge.lastMonth, 6);
+
+    // A relève le montant (n'affecte que l'avenir côté A) et porte un horodatage
+    // strictement plus récent. Le repère d'A reste en début de vie (A n'a jamais
+    // matérialisé), donc plus en arrière que celui de B.
+    RecurringExpense updated = recA.all().first();
+    updated.amountCents = 7000;
+    QVERIFY(recA.update(updated));
+    forceRecurringUpdatedAt(a, updated.id, QStringLiteral("2099-01-01T00:00:00"));
+
+    // B importe la version récente d'A.
+    QVERIFY2(serviceA.exportToFile(fromA, &error), qPrintable(error));
+    MergeReport report;
+    QVERIFY2(serviceB.importFromFile(fromA, report, &error), qPrintable(error));
+
+    QCOMPARE(report.recurringUpdated, 1);
+    QCOMPARE(report.recurringAdded, 0);
+    QCOMPARE(report.conflicts.size(), 1);
+    QCOMPARE(report.conflicts.first().table, QStringLiteral("recurring_expenses"));
+    QVERIFY(report.conflicts.first().description.contains(QStringLiteral("montant")));
+
+    const RecurringExpense afterMerge = recB.all().first();
+    // Le montant est mis à jour (le plus récent l'emporte)...
+    QCOMPARE(afterMerge.amountCents, qint64(7000));
+    // ...mais le repère de matérialisation de B n'a pas reculé vers celui d'A.
+    QCOMPARE(afterMerge.lastYear, 2025);
+    QCOMPARE(afterMerge.lastMonth, 6);
+}
+
 // Une ligne référençant une catégorie inconnue est ignorée (comptée dans skipped),
 // sans rien insérer.
 void ExchangeTest::unknownCategoryIsSkipped()
@@ -448,6 +540,48 @@ void ExchangeTest::unknownCategoryIsSkipped()
     QVERIFY(expB.forMonth(2025, 10).isEmpty());
 }
 
+// Un paiement récurrent rattaché à une catégorie absente localement est ignoré
+// (compté dans skipped), sans faire échouer tout l'import.
+void ExchangeTest::unknownCategorySkipsRecurring()
+{
+    const QString fileB = m_dir->filePath(QStringLiteral("b.db"));
+    Database b(fileB, QStringLiteral("skiprec-b"));
+    QVERIFY(b.open());
+
+    QJsonObject recurring;
+    recurring.insert(QStringLiteral("uuid"),
+                     QStringLiteral("44444444-4444-4444-4444-444444444444"));
+    recurring.insert(QStringLiteral("amount"), 5000.0);
+    recurring.insert(QStringLiteral("label"), QJsonValue());
+    recurring.insert(QStringLiteral("category"), QStringLiteral("categorie.inexistante"));
+    recurring.insert(QStringLiteral("dayOfMonth"), 5);
+    recurring.insert(QStringLiteral("startYear"), 2025);
+    recurring.insert(QStringLiteral("startMonth"), 1);
+    recurring.insert(QStringLiteral("active"), true);
+    recurring.insert(QStringLiteral("lastYear"), 0);
+    recurring.insert(QStringLiteral("lastMonth"), 0);
+    recurring.insert(QStringLiteral("createdAt"), QStringLiteral("2025-01-01T10:00:00"));
+    recurring.insert(QStringLiteral("updatedAt"), QStringLiteral("2025-01-01T10:00:00"));
+    recurring.insert(QStringLiteral("deleted"), false);
+
+    QJsonObject root;
+    root.insert(QStringLiteral("format"), QString::fromLatin1(ExchangeService::formatName()));
+    root.insert(QStringLiteral("formatVersion"), ExchangeService::formatVersion);
+    root.insert(QStringLiteral("exportedAt"), QStringLiteral("2025-01-01T10:00:00"));
+    root.insert(QStringLiteral("expenses"), QJsonArray());
+    root.insert(QStringLiteral("recurring"), QJsonArray{recurring});
+
+    ExchangeService service(b);
+    MergeReport report;
+    QString error;
+    QVERIFY2(service.importDocument(QJsonDocument(root), report, &error), qPrintable(error));
+
+    QCOMPARE(report.skipped, 1);
+    QCOMPARE(report.recurringAdded, 0);
+    RecurringRepository recB(b);
+    QVERIFY(recB.all().isEmpty());
+}
+
 // Un fichier dont le format n'est pas reconnu est refusé proprement (cas réel :
 // mauvais fichier sélectionné).
 void ExchangeTest::unsupportedFormatIsRejected()
@@ -473,6 +607,58 @@ void ExchangeTest::unsupportedFormatIsRejected()
     QString futureError;
     QVERIFY(!service.importDocument(QJsonDocument(future), report, &futureError));
     QVERIFY(!futureError.isEmpty());
+}
+
+// Un fichier dont le contenu n'est pas du JSON valide est refusé avec un message
+// (cas réel : fichier corrompu ou tronqué).
+void ExchangeTest::malformedJsonFileIsRejected()
+{
+    const QString fileB = m_dir->filePath(QStringLiteral("b.db"));
+    Database b(fileB, QStringLiteral("malformed-b"));
+    QVERIFY(b.open());
+
+    const QString path = m_dir->filePath(QStringLiteral("corrompu.json"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QByteArrayLiteral("{ ceci n'est pas du json "));
+    file.close();
+
+    ExchangeService service(b);
+    MergeReport report;
+    QString error;
+    QVERIFY(!service.importFromFile(path, report, &error));
+    QVERIFY(!error.isEmpty());
+}
+
+// Importer depuis un fichier inexistant échoue proprement (cas réel : chemin
+// erroné ou support retiré).
+void ExchangeTest::missingImportFileIsReported()
+{
+    const QString fileB = m_dir->filePath(QStringLiteral("b.db"));
+    Database b(fileB, QStringLiteral("missing-b"));
+    QVERIFY(b.open());
+
+    ExchangeService service(b);
+    MergeReport report;
+    QString error;
+    QVERIFY(!service.importFromFile(m_dir->filePath(QStringLiteral("absent.json")), report, &error));
+    QVERIFY(!error.isEmpty());
+}
+
+// Un document JSON valide mais dont la racine n'est pas un objet (p. ex. un
+// tableau produit par un autre logiciel) est refusé sans planter.
+void ExchangeTest::nonObjectRootIsRejected()
+{
+    const QString fileB = m_dir->filePath(QStringLiteral("b.db"));
+    Database b(fileB, QStringLiteral("nonobj-b"));
+    QVERIFY(b.open());
+
+    ExchangeService service(b);
+    MergeReport report;
+    QString error;
+    const QJsonDocument document(QJsonArray{QJsonValue(1), QJsonValue(2)});
+    QVERIFY(!service.importDocument(document, report, &error));
+    QVERIFY(!error.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(ExchangeTest)

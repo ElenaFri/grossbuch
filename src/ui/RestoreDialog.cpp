@@ -65,6 +65,10 @@ void RestoreDialog::updateRestoreButton()
     m_restore->setEnabled(m_backups->currentItem() != nullptr);
 }
 
+// Slot modal : confirmation puis restauration, QMessageBox bloquants. Non
+// couvrable sans automatisation fragile de fenêtres modales : exclu de la mesure
+// de couverture. Voir docs/adr/0019.
+// LCOV_EXCL_START
 void RestoreDialog::onRestore()
 {
     QListWidgetItem *item = m_backups->currentItem();
@@ -91,5 +95,6 @@ void RestoreDialog::onRestore()
                             tr("%1\nL'application va redémarrer.").arg(result.message));
     accept();
 }
+// LCOV_EXCL_STOP
 
 } // namespace grossbuch

@@ -6,6 +6,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QSet>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QVariant>
 #include <QtTest>
@@ -48,6 +49,7 @@ private slots:
     void updateRefreshesTimestampAndRejectsDeleted();
     void integrityCheckPassesOnHealthyBase();
     void migratesV2BaseToSynchronizableSchema();
+    void defaultDatabasePathIsUnderAppData();
 
 private:
     int categoryId(const QString &name) const;
@@ -701,6 +703,17 @@ void CoreTest::migratesV2BaseToSynchronizableSchema()
         QCOMPARE(march.size(), 1);
         QCOMPARE(march.first().uuid, migratedUuid); // identité stable d'une ouverture à l'autre
     }
+}
+
+// La base par défaut est rangée sous l'emplacement de données de l'application
+// (contrat d'emplacement : une seule base, au bon endroit, nommée grossbuch.db).
+void CoreTest::defaultDatabasePathIsUnderAppData()
+{
+    const QString path = Database::defaultDatabasePath();
+    QVERIFY(path.endsWith(QStringLiteral("grossbuch.db")));
+    const QString appData = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QVERIFY(!appData.isEmpty());
+    QVERIFY(path.startsWith(appData));
 }
 
 QTEST_GUILESS_MAIN(CoreTest)

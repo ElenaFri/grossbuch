@@ -5,6 +5,10 @@
 #include "core/ExpenseRepository.h"
 #include "core/ExchangeService.h"
 
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -25,13 +29,19 @@ private slots:
 
     void exportThenImportRoundTrip();
     void importReportsCountsAndEmitsSignal();
+    void importReportMentionsSkippedAndConflicts();
     void importFailureReportsError();
+    void exportToUnwritablePathReportsError();
     void restoreBringsBaseBackToBackupState();
     void restoreFailureKeepsBaseUsable();
 
 private:
     static int addExpense(ExpenseRepository &repo, int categoryId, qint64 cents, const QDate &date);
     static int firstSelectableCategory(const CategoryRepository &categories);
+    static QString firstCategoryKey(const CategoryRepository &categories);
+    static QJsonObject makeExpenseJson(const QString &uuid, double amount, const QString &date,
+                                       const QString &categoryKey, const QString &updatedAt);
+    static void writeExchangeFile(const QString &path, const QJsonArray &expenses);
 
     std::unique_ptr<QTemporaryDir> m_dir;
 };
@@ -61,6 +71,46 @@ int DataControllerTest::firstSelectableCategory(const CategoryRepository &catego
 {
     const QVector<Category> selectable = categories.selectable();
     return selectable.isEmpty() ? 0 : selectable.first().id;
+}
+
+QString DataControllerTest::firstCategoryKey(const CategoryRepository &categories)
+{
+    const QVector<Category> selectable = categories.selectable();
+    return selectable.isEmpty() ? QString() : selectable.first().key;
+}
+
+// Construit un objet dépense au format d'échange (voir ExchangeService).
+QJsonObject DataControllerTest::makeExpenseJson(const QString &uuid, double amount,
+                                               const QString &date, const QString &categoryKey,
+                                               const QString &updatedAt)
+{
+    QJsonObject expense;
+    expense.insert(QStringLiteral("uuid"), uuid);
+    expense.insert(QStringLiteral("amount"), amount);
+    expense.insert(QStringLiteral("date"), date);
+    expense.insert(QStringLiteral("label"), QJsonValue());
+    expense.insert(QStringLiteral("category"), categoryKey);
+    expense.insert(QStringLiteral("recurring"), QJsonValue());
+    expense.insert(QStringLiteral("createdAt"), QStringLiteral("2025-01-01T10:00:00"));
+    expense.insert(QStringLiteral("updatedAt"), updatedAt);
+    expense.insert(QStringLiteral("deleted"), false);
+    return expense;
+}
+
+// Écrit un document d'échange complet (en-tête + dépenses) sur disque.
+void DataControllerTest::writeExchangeFile(const QString &path, const QJsonArray &expenses)
+{
+    QJsonObject root;
+    root.insert(QStringLiteral("format"), QString::fromLatin1(ExchangeService::formatName()));
+    root.insert(QStringLiteral("formatVersion"), ExchangeService::formatVersion);
+    root.insert(QStringLiteral("exportedAt"), QStringLiteral("2025-02-01T10:00:00"));
+    root.insert(QStringLiteral("expenses"), expenses);
+    root.insert(QStringLiteral("recurring"), QJsonArray());
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    file.write(QJsonDocument(root).toJson());
+    file.close();
 }
 
 // Exporter puis importer dans une base vierge reconstruit les données.
@@ -129,6 +179,58 @@ void DataControllerTest::importReportsCountsAndEmitsSignal()
     QCOMPARE(controller.backups().size(), 1);
 }
 
+// Un import venu d'un autre poste peut à la fois ignorer des lignes (catégorie
+// absente localement) et provoquer un conflit (version plus récente d'une dépense
+// déjà présente). Le compte rendu doit mentionner les deux cas.
+void DataControllerTest::importReportMentionsSkippedAndConflicts()
+{
+    const QString fileB = m_dir->filePath(QStringLiteral("b.db"));
+    const QString seed = m_dir->filePath(QStringLiteral("seed.json"));
+    const QString incoming = m_dir->filePath(QStringLiteral("incoming.json"));
+    const QString backupsB = m_dir->filePath(QStringLiteral("backups-b"));
+
+    Database b(fileB, QStringLiteral("dc-report-mix"));
+    QVERIFY(b.open());
+    CategoryRepository categories(b);
+    const QString key = firstCategoryKey(categories);
+    QVERIFY(!key.isEmpty());
+
+    const QString uuid = QStringLiteral("22222222-2222-2222-2222-222222222222");
+
+    // État initial de B : une dépense à 10,00 € (version du 1er janvier).
+    writeExchangeFile(seed, QJsonArray{makeExpenseJson(uuid, 1000.0, QStringLiteral("2025-01-15"),
+                                                       key, QStringLiteral("2025-01-01T10:00:00"))});
+    {
+        ExchangeService service(b);
+        MergeReport report;
+        QString error;
+        QVERIFY2(service.importFromFile(seed, report, &error), qPrintable(error));
+    }
+
+    // Fichier reçu : version plus récente et divergente de la même dépense (conflit)
+    // plus une dépense rattachée à une catégorie inconnue (ignorée).
+    writeExchangeFile(
+        incoming,
+        QJsonArray{
+            makeExpenseJson(uuid, 2000.0, QStringLiteral("2025-01-15"), key,
+                            QStringLiteral("2025-02-01T10:00:00")),
+            makeExpenseJson(QStringLiteral("33333333-3333-3333-3333-333333333333"), 500.0,
+                            QStringLiteral("2025-02-10"), QStringLiteral("categorie.inexistante"),
+                            QStringLiteral("2025-02-01T10:00:00"))});
+
+    DataController controller(b, backupsB);
+    const DataController::Result result = controller.importFromFile(incoming);
+    QVERIFY2(result.ok, qPrintable(result.message));
+    QVERIFY(result.message.contains(QStringLiteral("ignor\u00e9e(s)")));
+    QVERIFY(result.message.contains(QStringLiteral("conflit(s)")));
+
+    // La dépense en conflit a bien pris la valeur la plus récente.
+    ExpenseRepository expB(b);
+    const QVector<Expense> january = expB.forMonth(2025, 1);
+    QCOMPARE(january.size(), 1);
+    QCOMPARE(january.first().amountCents, qint64(2000));
+}
+
 // Un fichier illisible produit un échec explicite, sans émettre dataChanged().
 void DataControllerTest::importFailureReportsError()
 {
@@ -143,6 +245,23 @@ void DataControllerTest::importFailureReportsError()
     QVERIFY(!result.ok);
     QVERIFY(!result.message.isEmpty());
     QCOMPARE(spy.count(), 0);
+}
+
+// Exporter vers un emplacement non inscriptible échoue proprement (dossier parent
+// inexistant) : le contrôleur renvoie une erreur plutôt que de planter.
+void DataControllerTest::exportToUnwritablePathReportsError()
+{
+    const QString fileB = m_dir->filePath(QStringLiteral("b.db"));
+    Database b(fileB, QStringLiteral("dc-export-fail"));
+    QVERIFY(b.open());
+
+    DataController controller(b, m_dir->filePath(QStringLiteral("backups-b")));
+    const QString badPath =
+        m_dir->filePath(QStringLiteral("dossier-absent/sous-dossier/export.json"));
+    const DataController::Result result = controller.exportToFile(badPath);
+
+    QVERIFY(!result.ok);
+    QVERIFY(result.message.contains(QStringLiteral("Export impossible")));
 }
 
 // Restaurer ramène la base à l'état figé dans la sauvegarde choisie.

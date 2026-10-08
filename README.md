@@ -105,7 +105,7 @@ ctest --test-dir build        # lancer les tests
 
 ## Générer le paquet `.deb`
 
-> Prérequis supplémentaire : `dpkg-dev` (fournit `dpkg-shlibdeps`, utilisé pour déduire automatiquement les dépendances Qt du paquet).
+> Aucun prérequis supplémentaire : les dépendances du paquet sont déclarées à la main pour rester portables entre distributions, et `dpkg-shlibdeps` est volontairement désactivé (voir docs/adr/0015). La génération ne requiert donc que CMake et CPack.
 
 ```sh
 cmake --build build --target package

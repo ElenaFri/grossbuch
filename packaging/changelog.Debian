@@ -1,3 +1,18 @@
+grossbuch (0.2.1-1) unstable; urgency=medium
+
+  * Navigation reworked around a menu bar (File, Edit, View, Help) with a single
+    view shown at a time; the tab bar and the navigation toolbar were removed.
+    Views remain reachable through the menus and Ctrl+1..4.
+  * The application now opens on the charts view, showing only the current year
+    by default (falling back to the most recent recorded year).
+  * Data management actions (export, import, restore a backup) moved from the
+    former Data tab into the File menu dialogs.
+  * Internal refactoring to reduce cognitive complexity in the database
+    migrations and the exchange engine; added a regression test ensuring the
+    application exits cleanly and does not linger in the background.
+
+ -- Elena FRISON <e_gavrilova_frison@zohomail.eu>  Thu, 08 Oct 2026 12:00:00 +0200
+
 grossbuch (0.2.0-1) unstable; urgency=medium
 
   * Durable and transferable data (offline).

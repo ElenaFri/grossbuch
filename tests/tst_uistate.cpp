@@ -1,7 +1,9 @@
 #include "core/CategoryRepository.h"
 #include "core/Database.h"
+#include "core/Expense.h"
 #include "core/ExpenseRepository.h"
 #include "core/RecurringRepository.h"
+#include "core/SyncService.h"
 #include "ui/AboutDialog.h"
 #include "ui/EntryTab.h"
 #include "ui/MainWindow.h"
@@ -15,7 +17,9 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDateEdit>
+#include <QDir>
 #include <QDoubleSpinBox>
+#include <QFile>
 #include <QGuiApplication>
 #include <QLabel>
 #include <QLineEdit>
@@ -54,6 +58,8 @@ private slots:
     void aboutDialogShowsVersion();
     void addingExpenseRefreshesSummary();
     void addingRecurringRefreshesEntry();
+    void autoSyncImportsOnOpenAndExportsOnClose();
+    void syncNowActionMergesPeer();
     void quittingClosesWithoutLingering();
 
 private:
@@ -61,6 +67,7 @@ private:
     static QStringList actionTexts(const MainWindow *window);
     static QAction *viewAction(const MainWindow *window, int index);
     static QAction *actionContaining(const MainWindow *window, const QString &needle);
+    QString makePeerSnapshot(const QString &sharedFolder, const QDate &date, qint64 cents);
 
     std::unique_ptr<Database> m_db;
     std::unique_ptr<CategoryRepository> m_categories;
@@ -318,6 +325,100 @@ void UiStateTest::aboutDialogShowsVersion()
             hasVersion = true;
     }
     QVERIFY(hasVersion);
+}
+
+// Crée un instantané pair (une autre machine) contenant une dépense, dans le
+// dossier partagé. Le fichier source .db est placé dans le dossier partagé (il
+// est ignoré par l'import, qui ne lit que les grossbuch-*.json).
+QString UiStateTest::makePeerSnapshot(const QString &sharedFolder, const QDate &date, qint64 cents)
+{
+    const QString peerDbPath = QDir(sharedFolder).filePath(QStringLiteral("peer-source.db"));
+    Database peer(peerDbPath, QStringLiteral("uistate-peer"));
+    const bool opened = peer.open();
+    Q_ASSERT(opened);
+    Q_UNUSED(opened);
+
+    CategoryRepository cat(peer);
+    ExpenseRepository exp(peer);
+    int courses = 0;
+    for (const Category &category : cat.all()) {
+        if (category.key == QStringLiteral("alimentation.courses"))
+            courses = category.id;
+    }
+
+    Expense expense;
+    expense.amountCents = cents;
+    expense.date = date;
+    expense.label = QStringLiteral("pair");
+    expense.categoryId = courses;
+    exp.add(expense);
+
+    QDir(sharedFolder).mkpath(QStringLiteral("backups"));
+    SyncService sync(peer, sharedFolder, QStringLiteral("peer-device"),
+                     QDir(sharedFolder).filePath(QStringLiteral("backups")));
+    sync.exportToSharedFolder();
+    return expense.label;
+}
+
+// Intégration : avec la synchronisation automatique activée et configurée, ouvrir
+// la fenêtre importe et fusionne l'instantané pair, et la fermer exporte
+// l'instantané local. Couvre les branches auto-sync du constructeur et de
+// closeEvent, ainsi que le connecteur du signal imported().
+void UiStateTest::autoSyncImportsOnOpenAndExportsOnClose()
+{
+    QTemporaryDir shared;
+    QVERIFY(shared.isValid());
+    makePeerSnapshot(shared.path(), QDate(2026, 6, 15), 1234);
+
+    QSettings settings(QStringLiteral("grossbuch"), QStringLiteral("grossbuch"));
+    settings.setValue(QStringLiteral("sync/sharedFolder"), shared.path());
+    settings.setValue(QStringLiteral("sync/auto"), true);
+    settings.setValue(QStringLiteral("sync/deviceId"), QStringLiteral("main-device"));
+    settings.sync();
+
+    auto window = makeWindow();
+
+    // L'import automatique à l'ouverture a fusionné la dépense du pair.
+    const QVector<Expense> june = m_expenses->forMonth(2026, 6);
+    QCOMPARE(june.size(), 1);
+    QCOMPARE(june.first().amountCents, qint64(1234));
+
+    // La fermeture exporte l'instantané de cette machine.
+    window->close();
+    const QString ownSnapshot =
+        QDir(shared.path()).filePath(QStringLiteral("grossbuch-main-device.json"));
+    QVERIFY(QFile::exists(ownSnapshot));
+}
+
+// Intégration : l'action « Synchroniser maintenant » fusionne l'instantané pair
+// même lorsque la synchronisation automatique est désactivée. Couvre onSyncNow.
+void UiStateTest::syncNowActionMergesPeer()
+{
+    QTemporaryDir shared;
+    QVERIFY(shared.isValid());
+
+    QSettings settings(QStringLiteral("grossbuch"), QStringLiteral("grossbuch"));
+    settings.setValue(QStringLiteral("sync/sharedFolder"), shared.path());
+    settings.setValue(QStringLiteral("sync/auto"), false);
+    settings.setValue(QStringLiteral("sync/deviceId"), QStringLiteral("main-device"));
+    settings.sync();
+
+    auto window = makeWindow();
+    // Synchro manuelle : rien n'a été importé à l'ouverture.
+    QVERIFY(m_expenses->forMonth(2026, 7).isEmpty());
+
+    // Le pair publie son instantané après l'ouverture.
+    makePeerSnapshot(shared.path(), QDate(2026, 7, 20), 5000);
+
+    QAction *syncNow = actionContaining(window.get(), QStringLiteral("Synchroniser"));
+    QVERIFY(syncNow != nullptr);
+    if (syncNow == nullptr)
+        return;
+    syncNow->trigger();
+
+    const QVector<Expense> july = m_expenses->forMonth(2026, 7);
+    QCOMPARE(july.size(), 1);
+    QCOMPARE(july.first().amountCents, qint64(5000));
 }
 
 // Régression : déclencher Quitter ferme la dernière fenêtre et laisse la boucle

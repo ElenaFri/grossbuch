@@ -11,6 +11,8 @@
 #include "ui/RecurringTab.h"
 #include "ui/RestoreDialog.h"
 #include "ui/SummaryTab.h"
+#include "ui/SyncController.h"
+#include "ui/SyncDialog.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -27,6 +29,7 @@
 #include <QProcess>
 #include <QStackedWidget>
 #include <QStandardPaths>
+#include <QStatusBar>
 
 namespace grossbuch {
 
@@ -48,6 +51,7 @@ MainWindow::MainWindow(Database &database, CategoryRepository &categories,
     resize(900, 600);
 
     m_dataController = new DataController(m_database, BackupService::defaultBackupDirectory(), this);
+    m_syncController = new SyncController(m_database, BackupService::defaultBackupDirectory(), this);
 
     m_entryTab = new EntryTab(m_categories, m_expenses);
     m_recurringTab = new RecurringTab(m_categories, m_recurring);
@@ -67,6 +71,11 @@ MainWindow::MainWindow(Database &database, CategoryRepository &categories,
     connect(m_recurringTab, &RecurringTab::recurringChanged, this,
             &MainWindow::onRecurringChanged);
     connect(m_dataController, &DataController::dataChanged, this, &MainWindow::refreshAllViews);
+    connect(m_syncController, &SyncController::imported, this,
+            [this](const SyncService::Result &result) {
+                refreshAllViews();
+                statusBar()->showMessage(result.message, 5000);
+            });
 
     // Restaure la géométrie de la dernière session.
     const QByteArray geometry = m_settings.value(QStringLiteral("ui/geometry")).toByteArray();
@@ -76,6 +85,13 @@ MainWindow::MainWindow(Database &database, CategoryRepository &categories,
     // Au lancement, on affiche toujours les graphiques (année en cours comprise).
     // Les autres vues s'ouvrent à la demande via les menus.
     setCurrentView(ViewCharts);
+
+    // Synchronisation automatique à l'ouverture : import silencieux si configuré.
+    if (m_syncController->autoSync() && m_syncController->isConfigured()) {
+        const SyncService::Result result = m_syncController->importNow();
+        if (!result.message.isEmpty())
+            statusBar()->showMessage(result.message, 5000);
+    }
 }
 
 void MainWindow::createMenus()
@@ -92,6 +108,13 @@ void MainWindow::createMenus()
 
     QAction *restoreAction = fileMenu->addAction(tr("&Restaurer une sauvegarde…"));
     connect(restoreAction, &QAction::triggered, this, &MainWindow::onRestore);
+
+    fileMenu->addSeparator();
+    QAction *syncNowAction = fileMenu->addAction(tr("&Synchroniser maintenant"));
+    connect(syncNowAction, &QAction::triggered, this, &MainWindow::onSyncNow);
+
+    QAction *configureSyncAction = fileMenu->addAction(tr("&Configurer la synchronisation…"));
+    connect(configureSyncAction, &QAction::triggered, this, &MainWindow::onConfigureSync);
 
     fileMenu->addSeparator();
     QAction *quitAction = fileMenu->addAction(tr("&Quitter"));
@@ -151,6 +174,10 @@ void MainWindow::setCurrentView(int index)
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
+    // Synchronisation automatique à la fermeture : export silencieux si configuré.
+    if (m_syncController->autoSync() && m_syncController->isConfigured())
+        m_syncController->exportNow();
+
     m_settings.setValue(QStringLiteral("ui/geometry"), saveGeometry());
     QMainWindow::closeEvent(event);
 }
@@ -176,6 +203,23 @@ void MainWindow::refreshAllViews()
     m_recurringTab->refresh();
     m_summaryTab->refresh();
     m_chartsTab->refresh();
+}
+
+// Synchronisation manuelle : import (fusion) puis export de l'instantané local.
+// Non modal (aucune boîte de dialogue). Un import qui modifie la base émet
+// imported() (rafraîchissement et message gérés par le connecteur du constructeur) ;
+// sinon on affiche simplement le bilan en barre d'état.
+void MainWindow::onSyncNow()
+{
+    if (!m_syncController->isConfigured()) {
+        statusBar()->showMessage(tr("Synchronisation non configurée."), 5000);
+        return;
+    }
+
+    const SyncService::Result imported = m_syncController->importNow();
+    m_syncController->exportNow();
+    if (!imported.changed)
+        statusBar()->showMessage(imported.message, 5000);
 }
 
 // Les slots suivants pilotent des dialogues natifs modaux (QFileDialog,
@@ -248,6 +292,12 @@ void MainWindow::onAbout()
 void MainWindow::onGuide()
 {
     GuideDialog dialog(this);
+    dialog.exec();
+}
+
+void MainWindow::onConfigureSync()
+{
+    SyncDialog dialog(*m_syncController, this);
     dialog.exec();
 }
 // LCOV_EXCL_STOP

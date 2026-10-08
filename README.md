@@ -25,6 +25,7 @@ L'application se pilote par une barre de menus (Fichier, Édition, Affichage, Ai
 - Récapitulatif (menu Affichage) : tableau agrégé par catégorie racine avec le détail par sous-catégorie, pour un mois ou une année au choix, avec un total général.
 - Graphiques annuels (menu Affichage) : courbes des dépenses totales mensuelles superposables d'une année sur l'autre ; au lancement, seule l'année en cours est tracée, les autres restant sélectionnables.
 - Échange et sauvegardes (menu Fichier) : export vers un fichier d'échange, import avec fusion (rapport affiché), et restauration d'une sauvegarde choisie dans une liste.
+- Synchronisation distante (menu Fichier) : un dossier partagé (géré par Syncthing, Nextcloud, Dropbox ou équivalent) dans lequel chaque machine dépose son propre instantané ; import et fusion automatiques des instantanés des autres appareils à l'ouverture, export à la fermeture, et action « Synchroniser maintenant » manuelle. La base vivante n'est jamais synchronisée directement.
 - Aide (menu Aide) : guide d'utilisation concis et boîte À propos (nom, version, licence, auteur, lien vers le dépôt et version de Qt).
 
 Socle technique : stockage local SQLite, montants stockés en centimes pour éviter les erreurs d'arrondi, interface francophone, persistance de l'état de la fenêtre, distribution en paquet `.deb` et release GitHub automatisée sur les tags.
@@ -87,10 +88,10 @@ L'architecture retenue est hors ligne d'abord (offline-first). Chaque machine co
 
 ### v0.3.0 — Synchronisation distante semi-automatique
 
-- [ ] Chemin d'un dossier partagé configurable (géré côté système par Syncthing, Nextcloud, Dropbox ou équivalent)
-- [ ] Export du fichier d'échange à la fermeture et import avec fusion à l'ouverture
-- [ ] Garantie de ne jamais synchroniser la base vivante, uniquement le fichier d'échange
-- [ ] (Optionnel) Chiffrement du fichier d'échange pour un transit par un cloud tiers
+- [x] Chemin d'un dossier partagé configurable (géré côté système par Syncthing, Nextcloud, Dropbox ou équivalent)
+- [x] Export du fichier d'échange à la fermeture et import avec fusion à l'ouverture
+- [x] Garantie de ne jamais synchroniser la base vivante, uniquement le fichier d'échange
+- [ ] (Optionnel, reporté) Chiffrement du fichier d'échange pour un transit par un cloud tiers
 
 ## Construire le projet
 

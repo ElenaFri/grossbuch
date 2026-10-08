@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 project(grossbuch
-    VERSION 0.2.1
+    VERSION 0.3.0
     DESCRIPTION "Comptabilité privée"
     LANGUAGES CXX
 )
@@ -48,6 +48,7 @@ add_library(grossbuch_core STATIC
     src/core/ExchangeService.cpp
     src/core/BackupService.cpp
     src/core/DataController.cpp
+    src/core/SyncService.cpp
 )
 
 target_include_directories(grossbuch_core PUBLIC src)
@@ -67,6 +68,8 @@ add_library(grossbuch_ui STATIC
     src/ui/AboutDialog.cpp
     src/ui/GuideDialog.cpp
     src/ui/RestoreDialog.cpp
+    src/ui/SyncController.cpp
+    src/ui/SyncDialog.cpp
     src/ui/UiHelpers.cpp
 )
 

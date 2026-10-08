@@ -16,6 +16,7 @@ class CategoryRepository;
 class ExpenseRepository;
 class RecurringRepository;
 class DataController;
+class SyncController;
 class EntryTab;
 class RecurringTab;
 class SummaryTab;
@@ -51,6 +52,10 @@ private slots:
     void onExport();
     void onRestore();
 
+    // Actions de synchronisation distante (menu Fichier).
+    void onSyncNow();
+    void onConfigureSync();
+
     // Actions du menu Aide.
     void onAbout();
     void onGuide();
@@ -67,6 +72,7 @@ private:
     ExpenseRepository &m_expenses;
     RecurringRepository &m_recurring;
     DataController *m_dataController = nullptr;
+    SyncController *m_syncController = nullptr;
 
     // Stocke l'état de l'interface (géométrie) dans ~/.config, séparément des
     // données (constructeur explicite org/app : ne touche pas au chemin

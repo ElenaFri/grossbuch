@@ -1,3 +1,20 @@
+grossbuch (0.3.0-1) unstable; urgency=medium
+
+  * Semi-automatic remote synchronisation through a shared folder managed by a
+    third-party tool (Syncthing, Nextcloud, Dropbox or similar). Each machine
+    writes its own snapshot (grossbuch-<deviceId>.json); on open the application
+    merges every peer snapshot except its own, and on close it exports its
+    snapshot. A manual "Synchronise now" action is available in the File menu.
+  * Synchronisation is configurable from File > "Configure synchronisation"
+    (shared folder and automatic synchronisation toggle); it is disabled by
+    default. The live database is never synchronised directly, only the exchange
+    file.
+  * A single backup is taken before each batch of imports; missing or
+    unavailable folders are skipped silently without blocking open or close, and
+    corrupted peer snapshots are ignored.
+
+ -- Elena FRISON <e_gavrilova_frison@zohomail.eu>  Thu, 08 Oct 2026 14:00:00 +0200
+
 grossbuch (0.2.1-1) unstable; urgency=medium
 
   * Navigation reworked around a menu bar (File, Edit, View, Help) with a single

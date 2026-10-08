@@ -48,6 +48,17 @@ target_compile_options(tst_datacontroller PRIVATE
 
 add_test(NAME tst_datacontroller COMMAND tst_datacontroller)
 
+# Tests de la synchronisation distante par dossier partagé (Qt Test, cœur). Voir
+# docs/adr/0020.
+add_executable(tst_sync tst_sync.cpp)
+target_link_libraries(tst_sync PRIVATE grossbuch_core Qt6::Test)
+
+target_compile_options(tst_sync PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_sync COMMAND tst_sync)
+
 # Tests de l'onglet de saisie (Qt Test, Widgets). Voir Phase 4 du plan.
 add_executable(tst_entrytab tst_entrytab.cpp)
 target_link_libraries(tst_entrytab PRIVATE grossbuch_ui Qt6::Test)
@@ -119,3 +130,15 @@ target_compile_options(tst_restoredialog PRIVATE
 add_test(NAME tst_restoredialog COMMAND tst_restoredialog)
 # Exécution sans serveur graphique.
 set_tests_properties(tst_restoredialog PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Tests de la configuration de synchronisation (Qt Test, Widgets). Voir docs/adr/0020.
+add_executable(tst_syncdialog tst_syncdialog.cpp)
+target_link_libraries(tst_syncdialog PRIVATE grossbuch_ui Qt6::Test)
+
+target_compile_options(tst_syncdialog PRIVATE
+    $<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>
+)
+
+add_test(NAME tst_syncdialog COMMAND tst_syncdialog)
+# Exécution sans serveur graphique.
+set_tests_properties(tst_syncdialog PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

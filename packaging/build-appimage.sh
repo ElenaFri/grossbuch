@@ -29,22 +29,22 @@ DESTDIR="${APPDIR}" cmake --install "${BUILD_DIR}" --prefix /usr
 mkdir -p "${TOOLS_DIR}"
 LINUXDEPLOY="${TOOLS_DIR}/linuxdeploy-x86_64.AppImage"
 LINUXDEPLOY_QT="${TOOLS_DIR}/linuxdeploy-plugin-qt-x86_64.AppImage"
-if [ ! -f "${LINUXDEPLOY}" ]; then
-    curl -fsSL -o "${LINUXDEPLOY}" \
+if [[ ! -f "${LINUXDEPLOY}" ]]; then
+    curl -fsSL --proto '=https' --proto-redir '=https' -o "${LINUXDEPLOY}" \
         https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
 fi
-if [ ! -f "${LINUXDEPLOY_QT}" ]; then
-    curl -fsSL -o "${LINUXDEPLOY_QT}" \
+if [[ ! -f "${LINUXDEPLOY_QT}" ]]; then
+    curl -fsSL --proto '=https' --proto-redir '=https' -o "${LINUXDEPLOY_QT}" \
         https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
 fi
 chmod +x "${LINUXDEPLOY}" "${LINUXDEPLOY_QT}"
 
 # Le greffon Qt localise Qt via qmake : on le lui indique explicitement car,
 # sur Debian/Ubuntu, le binaire s'appelle qmake6.
-if [ -z "${QMAKE:-}" ]; then
+if [[ -z "${QMAKE:-}" ]]; then
     if command -v qmake6 >/dev/null 2>&1; then
         QMAKE="$(command -v qmake6)"
-    elif [ -x /usr/lib/qt6/bin/qmake6 ]; then
+    elif [[ -x /usr/lib/qt6/bin/qmake6 ]]; then
         QMAKE=/usr/lib/qt6/bin/qmake6
     fi
 fi

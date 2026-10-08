@@ -8,12 +8,11 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-
 jobs:
   build-deb:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Récupérer le dépôt
@@ -51,6 +50,8 @@ jobs:
     # AppImage construite sur Ubuntu 22.04 pour viser une glibc plus ancienne et
     # une portabilité large. Voir docs/adr/0021.
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
 
     steps:
       - name: Récupérer le dépôt
@@ -64,6 +65,7 @@ jobs:
             build-essential \
             qt6-base-dev \
             libqt6charts6-dev \
+            libqt6opengl6-dev \
             libqt6sql6-sqlite \
             libgl1-mesa-dev \
             curl \
